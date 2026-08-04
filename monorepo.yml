@@ -1,0 +1,9 @@
+monorepo_url: https://github.com/contao/setup-and-testing.git
+branch_filter: /^(main|\d+\.\d+)$/
+
+repositories:
+    e2e-test-bundle:
+        url: https://github.com/contao/e2e-test-bundle.git
+
+    installation-recipe:
+        url: https://github.com/contao/installation-recipe.git
