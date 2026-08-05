@@ -1,2 +1,7 @@
 # Monorepo Tools
 /.monorepo-split-cache/
+
+# Development tools
+/.contao-e2e/
+/vendor/
+/vendor-bin/*/vendor/

@@ -1,0 +1,5 @@
+{
+    "require": {
+        "contao/news-bundle": "^5.3 || ^5.7 || ^6.0"
+    }
+}

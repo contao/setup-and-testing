@@ -1,0 +1,2 @@
+contao:
+    csrf_cookie_prefix: example_theme

@@ -1,0 +1,11 @@
+{
+    "require": {
+        "phpstan/phpstan": "^2.0",
+        "phpstan/phpstan-phpunit": "^2.0"
+    },
+    "config": {
+        "platform": {
+            "php": "8.4"
+        }
+    }
+}

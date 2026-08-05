@@ -1,0 +1,11 @@
+format: 1
+name: contao/example-theme
+composer: composer.json
+config:
+    - config/theme.yaml
+fixtures:
+    - fixtures/pages.yaml
+files:
+    - source: files/files/example-theme
+      target: files/example-theme
+      overwrite: false

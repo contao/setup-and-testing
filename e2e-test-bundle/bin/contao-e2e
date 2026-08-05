@@ -1,0 +1,18 @@
+#!/usr/bin/env php
+<?php
+
+declare(strict_types=1);
+
+use Contao\E2eTestBundle\Command\E2eApplication;
+
+$autoload = $GLOBALS['_composer_autoload_path'] ?? null;
+
+if (!\is_string($autoload)) {
+    fwrite(STDERR, "Run this command through Composer's vendor/bin/contao-e2e proxy.\n");
+
+    exit(1);
+}
+
+require $autoload;
+
+exit(new E2eApplication()->run());

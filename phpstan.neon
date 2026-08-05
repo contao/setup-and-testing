@@ -1,0 +1,16 @@
+includes:
+    - vendor-bin/phpstan/vendor/phpstan/phpstan/conf/bleedingEdge.neon
+    - vendor-bin/phpstan/vendor/phpstan/phpstan-phpunit/extension.neon
+    - vendor-bin/phpstan/vendor/phpstan/phpstan-phpunit/rules.neon
+
+parameters:
+    level: 6
+    bootstrapFiles:
+        - vendor/autoload.php
+    paths:
+        - installation-recipe/src
+        - installation-recipe/tests
+        - e2e-test-bundle/src
+        - e2e-test-bundle/tests
+    treatPhpDocTypesAsCertain: false
+    rememberPossiblyImpureFunctionValues: false

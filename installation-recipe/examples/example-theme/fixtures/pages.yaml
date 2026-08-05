@@ -1,0 +1,13 @@
+tl_page:
+    example_root:
+        pid: 0
+        type: root
+        title: Example site
+        alias: example-site
+        published: true
+    example_page:
+        pid: '@example_root'
+        type: regular
+        title: Example page
+        alias: example-page
+        published: true

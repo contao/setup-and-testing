@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<phpunit colors="true"
+         bootstrap="vendor/autoload.php"
+         cacheDirectory=".contao-e2e/cache/phpunit">
+  <testsuites>
+    <testsuite name="packages">
+      <directory>installation-recipe/tests</directory>
+      <directory>e2e-test-bundle/tests</directory>
+    </testsuite>
+  </testsuites>
+</phpunit>
