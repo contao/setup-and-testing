@@ -52,17 +52,41 @@ final class LoginTest extends TestCase
 
     public function testLoginPage(): void
     {
-        $client = self::managedEdition()->createFirefoxClient();
+        $backend = self::managedEdition()->createFirefoxBackendBrowser();
+        $client = $backend->client();
         $client->request('GET', '/contao/login');
+        $backend->submitLogin('admin', 'password');
 
         self::assertSelectorTextContains('body', 'Contao');
     }
 }
 ```
 
+`BackendBrowser` wraps recurring Contao backend interactions without imposing another PHPUnit trait or base class. Chrome and Firefox variants are available from `ManagedEdition`; the underlying Panther client remains accessible through `client()` for arbitrary browser operations and assertions.
+
+```php
+$backend = self::managedEdition()->createFirefoxBackendBrowser();
+$backend->client()->request('GET', '/contao/login');
+$backend->submitLogin('admin', 'password');
+$backend->clickLink('Articles');
+$backend->submitNew();
+$backend->submitAction('Paste at the top');
+$backend->select('type', 'text');
+$backend->waitFor('textarea[name="text"]');
+$backend->fillRichText('text', 'Content created by an E2E test.');
+$backend->check('published');
+$backend->submitForm('Save and close', ['headline[value]' => 'Headline']);
+```
+
+The wrapper also supports buttons and operation links whose title starts with a translated label. `selectFile($field, $path, $expectedValue)` opens Contao's real modal file picker, expands nested directories, applies the selection, and optionally waits until the hidden widget value matches a known UUID.
+
+Recipe file mappings copy files into the Managed Edition. Call `ManagedEdition::synchronizeFiles('files/path/example.jpg')` when a test also needs those files registered in Contao's DBAFS, for example before selecting them in a backend file-tree widget. With no path, the complete configured filesystem is synchronized.
+
 Without an origin, Panther uses the local E2E server URI directly so that absolute redirects and cookies stay on the same browser origin. Pass `Origin::http('example.test')` or `Origin::https('example.test')` when a test must emulate a page DNS entry or HTTPS; the server maps that origin without requiring a real domain or certificate.
 
 Each consumer project gets one ignored `.contao-e2e/` workspace. Dependency, application, and fixture fingerprints are separate: unchanged Composer input reuses `vendor/`; source or configuration changes rerun setup and migrations; fixture-only changes only reset and reload the database. Parallel processes acquire separate installation and database slots.
+
+Xdebug is disabled for Composer, setup, migration, and other managed subprocesses as well as for the E2E web server. The `BackendBrowser` submit helpers wait for the submitted form to be replaced, which works with Contao's Turbo navigation without Panther's full-document navigation delay.
 
 `ManagedEdition::resetDatabase()` returns a `FixtureResult`. Call `$result->value('page_home')` to obtain the generated primary key of a named fixture, or pass a second column name to read another resolved value. `$result->interpolate('/pages/{page_home}')` substitutes generated values in paths or other strings.
 
