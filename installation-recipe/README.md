@@ -33,7 +33,17 @@ tl_page:
     alias: child-page
 ```
 
-Use `@fixture->column` to reference another resolved column and `\@value` for a literal string beginning with `@`. YAML sequences are resolved recursively and stored as PHP-serialized lists, which allows Contao multi-value fields to contain generated fixture IDs. Fixture names are global to a recipe and must be unique. Missing or circular dependencies abort the complete fixture transaction, so partially imported data is never left behind.
+Use `@fixture->column` to reference another resolved column and `\@value` for a literal string beginning with `@`. YAML arrays are resolved recursively and stored as PHP-serialized values by default, which allows Contao multi-value fields to contain generated fixture IDs. Prefix a value with `!json` when a column, including a virtual field's storage column, expects JSON instead:
+
+```yaml
+tl_example:
+  child:
+    options: !json
+      parent: '@root'
+      enabled: true
+```
+
+References inside JSON values are resolved before encoding. Fixture names are global to a recipe and must be unique. Missing or circular dependencies abort the complete fixture transaction, so partially imported data is never left behind.
 
 Rows without names use the original list syntax and can still provide explicit IDs when importing legacy fixtures. Named fixtures should normally omit auto-increment columns; this makes recipes safe to apply to existing databases whose next ID is not known in advance.
 

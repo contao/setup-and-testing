@@ -117,6 +117,42 @@ final class FixtureLoaderTest extends TestCase
         $this->assertSame(['1', 'literal'], unserialize($connection->fetchOne('SELECT related FROM example WHERE id = 2')));
     }
 
+    public function testResolvesReferencesInJsonValues(): void
+    {
+        $fixture = $this->fixture(<<<'YAML'
+            example:
+              parent:
+                options: []
+              child:
+                options: !json
+                  parent: '@parent'
+                  enabled: true
+                  values:
+                    - first
+                    - second
+            YAML);
+        $connection = DriverManager::getConnection(['driver' => 'pdo_sqlite', 'memory' => true]);
+        $connection->executeStatement('CREATE TABLE example (id INTEGER PRIMARY KEY AUTOINCREMENT, options TEXT NOT NULL)');
+
+        (new FixtureLoader())->load($connection, new FixtureSet([$fixture]));
+
+        $this->assertSame(
+            ['parent' => '1', 'enabled' => true, 'values' => ['first', 'second']],
+            json_decode((string) $connection->fetchOne('SELECT options FROM example WHERE id = 2'), true, 512, JSON_THROW_ON_ERROR),
+        );
+    }
+
+    public function testRejectsUnknownValueTags(): void
+    {
+        $fixture = $this->fixture("example:\n  row:\n    value: !xml '<value />'\n");
+        $connection = DriverManager::getConnection(['driver' => 'pdo_sqlite', 'memory' => true]);
+
+        $this->expectException(InvalidRecipeException::class);
+        $this->expectExceptionMessage('The fixture value tag "!xml"');
+
+        (new FixtureLoader())->load($connection, new FixtureSet([$fixture]));
+    }
+
     public function testRollsBackUnresolvableReferences(): void
     {
         $fixture = $this->fixture(<<<'YAML'

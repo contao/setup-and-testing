@@ -12,6 +12,8 @@ declare(strict_types=1);
 
 namespace Contao\InstallationRecipe\Fixture;
 
+use Symfony\Component\Yaml\Tag\TaggedValue;
+
 final readonly class FixtureValueResolver
 {
     /**
@@ -44,8 +46,12 @@ final readonly class FixtureValueResolver
 
     private function resolveValue(mixed $value, FixtureRegistry $registry): mixed
     {
+        if ($value instanceof TaggedValue) {
+            return json_encode($this->resolveStructuredValue($value->getValue(), $registry), JSON_THROW_ON_ERROR);
+        }
+
         if (\is_array($value)) {
-            return serialize($this->resolveArray($value, $registry));
+            return serialize($this->resolveStructuredValue($value, $registry));
         }
 
         return $this->resolveScalar($value, $registry);
@@ -62,16 +68,19 @@ final readonly class FixtureValueResolver
         return !$reference ? $value : $registry->get($reference->name)->value($reference->column);
     }
 
-    /**
-     * @param array<array-key, mixed> $values
-     *
-     * @return array<array-key, mixed>
-     */
-    private function resolveArray(array $values, FixtureRegistry $registry): array
+    private function resolveStructuredValue(mixed $value, FixtureRegistry $registry): mixed
     {
+        if ($value instanceof TaggedValue) {
+            return $this->resolveValue($value, $registry);
+        }
+
+        if (!\is_array($value)) {
+            return $this->resolveScalar($value, $registry);
+        }
+
         return array_map(
-            fn ($value) => \is_array($value) ? $this->resolveArray($value, $registry) : $this->resolveScalar($value, $registry),
-            $values,
+            fn ($item) => $this->resolveStructuredValue($item, $registry),
+            $value,
         );
     }
 
@@ -80,6 +89,10 @@ final readonly class FixtureValueResolver
      */
     private function collectMissingReferences(mixed $value, FixtureRegistry $registry, array &$missing): void
     {
+        if ($value instanceof TaggedValue) {
+            $value = $value->getValue();
+        }
+
         if (\is_array($value)) {
             foreach ($value as $item) {
                 $this->collectMissingReferences($item, $registry, $missing);

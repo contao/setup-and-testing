@@ -13,6 +13,7 @@ declare(strict_types=1);
 namespace Contao\InstallationRecipe\Fixture;
 
 use Contao\InstallationRecipe\Exception\InvalidRecipeException;
+use Symfony\Component\Yaml\Tag\TaggedValue;
 use Symfony\Component\Yaml\Yaml;
 
 final class FixtureParser
@@ -42,7 +43,7 @@ final class FixtureParser
      */
     private function parseFile(string $file): array
     {
-        $tables = Yaml::parseFile($file);
+        $tables = Yaml::parseFile($file, Yaml::PARSE_CUSTOM_TAGS);
 
         if (!\is_array($tables)) {
             throw new InvalidRecipeException(\sprintf('The fixture file "%s" must contain a table mapping.', $file));
@@ -97,7 +98,28 @@ final class FixtureParser
             $this->validateIdentifier($column, 'column', $file);
         }
 
+        foreach ($row as $value) {
+            $this->validateTags($value, $file);
+        }
+
         return $row;
+    }
+
+    private function validateTags(mixed $value, string $file): void
+    {
+        if ($value instanceof TaggedValue) {
+            if ('json' !== $value->getTag()) {
+                throw new InvalidRecipeException(\sprintf('The fixture value tag "!%s" in "%s" is invalid.', $value->getTag(), $file));
+            }
+
+            $value = $value->getValue();
+        }
+
+        if (\is_array($value)) {
+            foreach ($value as $item) {
+                $this->validateTags($item, $file);
+            }
+        }
     }
 
     private function validateFixtureName(mixed $name, string $file): void
