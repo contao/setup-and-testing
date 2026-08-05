@@ -32,12 +32,12 @@ trait ManagedEditionTestTrait
         self::$contaoManagedEditionFresh = false;
     }
 
-    public static function assertSelectorExists(string $selector, string $message = ''): void
+    public function assertSelectorExists(string $selector, string $message = ''): void
     {
         Assert::assertGreaterThan(0, self::managedEdition()->currentClient()->getCrawler()->filter($selector)->count(), $message);
     }
 
-    public static function assertSelectorTextContains(string $selector, string $text, string $message = ''): void
+    public function assertSelectorTextContains(string $selector, string $text, string $message = ''): void
     {
         $crawler = self::managedEdition()->currentClient()->getCrawler()->filter($selector);
         Assert::assertGreaterThan(0, $crawler->count(), $message);

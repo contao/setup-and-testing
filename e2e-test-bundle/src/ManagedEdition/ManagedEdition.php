@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Contao\E2eTestBundle\ManagedEdition;
 
 use Contao\E2eTestBundle\Browser\BackendBrowser;
+use Contao\E2eTestBundle\Browser\BrowserOptions;
+use Contao\E2eTestBundle\Browser\PantherClientFactory;
 use Contao\E2eTestBundle\Database\DatabaseManager;
 use Contao\E2eTestBundle\Database\DatabaseResetMode;
 use Contao\E2eTestBundle\Http\HttpRequest;
@@ -34,6 +36,7 @@ final class ManagedEdition
     public function __construct(
         private readonly ManagedEditionState $state,
         private readonly ServerManager $serverManager = new ServerManager(),
+        private readonly PantherClientFactory $pantherClientFactory = new PantherClientFactory(),
     ) {
     }
 
@@ -131,24 +134,30 @@ final class ManagedEdition
         return $browser;
     }
 
-    public function createFirefoxClient(Origin|null $origin = null): Client
+    public function createFirefoxClient(Origin|null $origin = null, BrowserOptions|null $options = null): Client
     {
-        return $this->rememberClient(Client::createFirefoxClient(null, null, [], $this->browserUri($origin)));
+        return $this->rememberClient($this->pantherClientFactory->createFirefox(
+            $this->browserUri($origin),
+            $options ?? BrowserOptions::create(),
+        ));
     }
 
-    public function createChromeClient(Origin|null $origin = null): Client
+    public function createChromeClient(Origin|null $origin = null, BrowserOptions|null $options = null): Client
     {
-        return $this->rememberClient(Client::createChromeClient(null, null, [], $this->browserUri($origin)));
+        return $this->rememberClient($this->pantherClientFactory->createChrome(
+            $this->browserUri($origin),
+            $options ?? BrowserOptions::create(),
+        ));
     }
 
-    public function createFirefoxBackendBrowser(Origin|null $origin = null): BackendBrowser
+    public function createFirefoxBackendBrowser(Origin|null $origin = null, BrowserOptions|null $options = null): BackendBrowser
     {
-        return new BackendBrowser($this->createFirefoxClient($origin));
+        return new BackendBrowser($this->createFirefoxClient($origin, $options));
     }
 
-    public function createChromeBackendBrowser(Origin|null $origin = null): BackendBrowser
+    public function createChromeBackendBrowser(Origin|null $origin = null, BrowserOptions|null $options = null): BackendBrowser
     {
-        return new BackendBrowser($this->createChromeClient($origin));
+        return new BackendBrowser($this->createChromeClient($origin, $options));
     }
 
     public function currentClient(): Client

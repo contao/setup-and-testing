@@ -29,6 +29,7 @@ export CONTAO_E2E_DATABASE_URL='mysql://root:password@127.0.0.1:3306'
 Use the trait with PHPUnit 10 through 13; no test base class is imposed:
 
 ```php
+use Contao\E2eTestBundle\Browser\BrowserOptions;
 use Contao\E2eTestBundle\ManagedEdition\ManagedEditionConfig;
 use Contao\E2eTestBundle\ManagedEdition\ManagedEditionTestTrait;
 use Contao\InstallationRecipe\Composer\ComposerConfig;
@@ -57,7 +58,7 @@ final class LoginTest extends TestCase
         $client->request('GET', '/contao/login');
         $backend->submitLogin('admin', 'password');
 
-        self::assertSelectorTextContains('body', 'Contao');
+        $this->assertSelectorTextContains('body', 'Contao');
     }
 }
 ```
@@ -79,6 +80,14 @@ $backend->submitForm('Save and close', ['headline[value]' => 'Headline']);
 ```
 
 The wrapper also supports buttons and operation links whose title starts with a translated label. `selectFile($field, $path, $expectedValue)` opens Contao's real modal file picker, expands nested directories, applies the selection, and optionally waits until the hidden widget value matches a known UUID.
+
+Use the browser-independent options object when a real browser request must exercise locale negotiation. It maps the accepted languages to the appropriate Firefox or Chrome preference:
+
+```php
+$options = BrowserOptions::create()->withAcceptLanguage('de-CH,de,en');
+$backend = self::managedEdition()->createFirefoxBackendBrowser(options: $options);
+// The same options work with createChromeBackendBrowser().
+```
 
 Recipe file mappings copy files into the Managed Edition. Call `ManagedEdition::synchronizeFiles('files/path/example.jpg')` when a test also needs those files registered in Contao's DBAFS, for example before selecting them in a backend file-tree widget. With no path, the complete configured filesystem is synchronized.
 
@@ -110,8 +119,8 @@ forms, cookies, history, and access to the last response:
 $browser = self::managedEdition()->createHttpBrowser(Origin::https('example.test'));
 $crawler = $browser->request('GET', '/');
 
-self::assertSame(200, $browser->getInternalResponse()->getStatusCode());
-self::assertSame('Example', trim($crawler->filterXPath('//head/title')->text()));
+$this->assertSame(200, $browser->getInternalResponse()->getStatusCode());
+$this->assertSame('Example', trim($crawler->filterXPath('//head/title')->text()));
 ```
 
 Full Managed Editions are stored below `.contao-e2e/cache/installations/<fingerprint>/<slot>/project`. The matching
