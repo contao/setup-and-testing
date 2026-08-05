@@ -26,6 +26,14 @@ An administrative database URL that may create test databases overrides Docker:
 export CONTAO_E2E_DATABASE_URL='mysql://root:password@127.0.0.1:3306'
 ```
 
+The PowerShell equivalent on Windows is:
+
+```powershell
+$env:CONTAO_E2E_DATABASE_URL = 'mysql://root:password@127.0.0.1:3306'
+```
+
+Windows is supported with native PHP and Composer. The automatic database requires Docker Desktop configured for Linux containers; alternatively, configure an existing MySQL or MariaDB server with `CONTAO_E2E_DATABASE_URL`. Composer creates Windows command proxies for `contao-e2e`, PHPUnit, Panther, and ParaTest, while the bundle invokes PHP, Composer, Git, Docker, and browser drivers without relying on a POSIX shell.
+
 Use the trait with PHPUnit 10 through 13; no test base class is imposed:
 
 ```php
@@ -113,6 +121,12 @@ XDEBUG_MODE=off vendor/bin/paratest \
     --processes=2 \
     --cache-directory=.contao-e2e/cache/phpunit \
     --tmp-dir=.contao-e2e/cache/paratest
+```
+
+Use the equivalent PowerShell command on Windows:
+
+```powershell
+$env:XDEBUG_MODE = 'off'; vendor\bin\paratest --testsuite=e2e --processes=2 --cache-directory=.contao-e2e/cache/phpunit --tmp-dir=.contao-e2e/cache/paratest
 ```
 
 Create `.contao-e2e/cache/paratest` before starting ParaTest, for example by running `vendor/bin/contao-e2e doctor --quiet`. Projects using Composer bin plugins may isolate ParaTest in a dedicated vendor-bin directory instead.

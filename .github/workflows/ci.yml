@@ -19,7 +19,7 @@ jobs:
               uses: shivammathur/setup-php@v2
               with:
                   php-version: '8.4'
-                  extensions: dom, intl, mbstring, pdo_mysql, zip
+                  extensions: dom, intl, mbstring, pdo_mysql, pdo_sqlite, zip
                   coverage: none
 
             - name: Checkout
@@ -71,16 +71,22 @@ jobs:
               run: vendor-bin/ecs/vendor/bin/ecs check --no-progress-bar
 
     phpunit:
-        name: PHPUnit ${{ matrix.phpunit }}, Symfony ${{ matrix.symfony }} on PHP ${{ matrix.php }}
-        runs-on: ubuntu-latest
+        name: PHPUnit ${{ matrix.phpunit }}, Symfony ${{ matrix.symfony }} on PHP ${{ matrix.php }} (${{ matrix.os }})
+        runs-on: ${{ matrix.os }}
         strategy:
             fail-fast: false
             matrix:
                 include:
-                    - php: '8.2'
+                    - os: ubuntu-latest
+                      php: '8.2'
                       phpunit: '10.5'
                       symfony: '6.4'
-                    - php: '8.4'
+                    - os: ubuntu-latest
+                      php: '8.4'
+                      phpunit: '13.0'
+                      symfony: '8.0'
+                    - os: windows-latest
+                      php: '8.4'
                       phpunit: '13.0'
                       symfony: '8.0'
         steps:
@@ -88,7 +94,7 @@ jobs:
               uses: shivammathur/setup-php@v2
               with:
                   php-version: ${{ matrix.php }}
-                  extensions: dom, intl, mbstring, pdo_mysql, zip
+                  extensions: dom, intl, mbstring, pdo_mysql, pdo_sqlite, zip
                   coverage: none
 
             - name: Checkout
@@ -97,20 +103,45 @@ jobs:
                   show-progress: false
                   persist-credentials: false
 
-            - name: Select the PHPUnit and Symfony versions
+            - name: Configure the PHPUnit and Symfony constraints
+              shell: php {0}
+              run: |
+                  <?php
+
+                  $composer = json_decode(file_get_contents('composer.json'), true, flags: JSON_THROW_ON_ERROR);
+                  $composer['require']['phpunit/phpunit'] = '^${{ matrix.phpunit }}';
+
+                  foreach ([
+                      'symfony/browser-kit',
+                      'symfony/console',
+                      'symfony/dependency-injection',
+                      'symfony/dom-crawler',
+                      'symfony/filesystem',
+                      'symfony/http-client',
+                      'symfony/http-kernel',
+                      'symfony/process',
+                      'symfony/yaml',
+                  ] as $package) {
+                      $composer['require'][$package] = '^${{ matrix.symfony }}';
+                  }
+
+                  $composer['require']['symfony/panther'] = '^2.1';
+                  file_put_contents('composer.json', json_encode($composer, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR)."\n");
+
+            - name: Install the selected PHPUnit and Symfony versions
               run: >-
-                  composer require
-                  phpunit/phpunit:^${{ matrix.phpunit }}
-                  symfony/browser-kit:^${{ matrix.symfony }}
-                  symfony/console:^${{ matrix.symfony }}
-                  symfony/dependency-injection:^${{ matrix.symfony }}
-                  symfony/dom-crawler:^${{ matrix.symfony }}
-                  symfony/filesystem:^${{ matrix.symfony }}
-                  symfony/http-client:^${{ matrix.symfony }}
-                  symfony/http-kernel:^${{ matrix.symfony }}
-                  symfony/panther:^2.1
-                  symfony/process:^${{ matrix.symfony }}
-                  symfony/yaml:^${{ matrix.symfony }}
+                  composer update
+                  phpunit/phpunit
+                  symfony/browser-kit
+                  symfony/console
+                  symfony/dependency-injection
+                  symfony/dom-crawler
+                  symfony/filesystem
+                  symfony/http-client
+                  symfony/http-kernel
+                  symfony/panther
+                  symfony/process
+                  symfony/yaml
                   --with-all-dependencies --no-interaction --no-progress
 
             - name: Run the tests
