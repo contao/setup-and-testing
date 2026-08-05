@@ -89,6 +89,8 @@ $backend = self::managedEdition()->createFirefoxBackendBrowser(options: $options
 // The same options work with createChromeBackendBrowser().
 ```
 
+Firefox and Chrome drivers are provisioned automatically with BDI when they are not already available on `PATH`. Matching drivers are cached in `.contao-e2e/drivers`, so subsequent test runs do not download them again. Set `GITHUB_TOKEN` in CI if unauthenticated GitHub API rate limits affect geckodriver detection.
+
 Recipe file mappings copy files into the Managed Edition. Call `ManagedEdition::synchronizeFiles('files/path/example.jpg')` when a test also needs those files registered in Contao's DBAFS, for example before selecting them in a backend file-tree widget. With no path, the complete configured filesystem is synchronized.
 
 Without an origin, Panther uses the local E2E server URI directly so that absolute redirects and cookies stay on the same browser origin. Pass `Origin::http('example.test')` or `Origin::https('example.test')` when a test must emulate a page DNS entry or HTTPS; the server maps that origin without requiring a real domain or certificate.

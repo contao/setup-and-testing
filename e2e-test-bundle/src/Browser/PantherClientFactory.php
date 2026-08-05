@@ -18,33 +18,39 @@ use Symfony\Component\Panther\Client;
 
 final readonly class PantherClientFactory
 {
-    public function __construct(private BrowserOptionsNormalizer $optionsNormalizer = new BrowserOptionsNormalizer())
-    {
+    public function __construct(
+        private BrowserOptionsNormalizer $optionsNormalizer = new BrowserOptionsNormalizer(),
+        private BrowserDriverManager $driverManager = new BrowserDriverManager(),
+    ) {
     }
 
-    public function createFirefox(string $baseUri, BrowserOptions $options): Client
+    public function createFirefox(string $baseUri, BrowserOptions $options, string $workspace): Client
     {
+        $driver = $this->driverManager->firefox($workspace);
+
         if (null === $options->acceptLanguage) {
-            return Client::createFirefoxClient(null, null, [], $baseUri);
+            return Client::createFirefoxClient($driver, null, [], $baseUri);
         }
 
         $arguments = $this->firefoxArguments();
         $firefoxOptions = $this->optionsNormalizer->forFirefox($options, $arguments);
         $managerOptions = ['capabilities' => [FirefoxOptions::CAPABILITY => $firefoxOptions]];
 
-        return Client::createFirefoxClient(null, $arguments, $managerOptions, $baseUri);
+        return Client::createFirefoxClient($driver, $arguments, $managerOptions, $baseUri);
     }
 
-    public function createChrome(string $baseUri, BrowserOptions $options): Client
+    public function createChrome(string $baseUri, BrowserOptions $options, string $workspace): Client
     {
+        $driver = $this->driverManager->chrome($workspace);
+
         if (null === $options->acceptLanguage) {
-            return Client::createChromeClient(null, null, [], $baseUri);
+            return Client::createChromeClient($driver, null, [], $baseUri);
         }
 
         $chromeOptions = $this->optionsNormalizer->forChrome($options);
         $managerOptions = ['capabilities' => [ChromeOptions::CAPABILITY => $chromeOptions]];
 
-        return Client::createChromeClient(null, null, $managerOptions, $baseUri);
+        return Client::createChromeClient($driver, null, $managerOptions, $baseUri);
     }
 
     /**

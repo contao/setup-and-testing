@@ -5,7 +5,9 @@
     "type": "library",
     "require": {
         "php": "^8.2",
+        "composer-runtime-api": "^2.1",
         "contao/installation-recipe": "self.version",
+        "dbrekelmans/bdi": "^1.4",
         "doctrine/dbal": "^3.6 || ^4.0",
         "php-webdriver/webdriver": "^1.15",
         "phpunit/phpunit": "^10.5 || ^11.5 || ^12.0 || ^13.0",

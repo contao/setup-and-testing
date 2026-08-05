@@ -139,6 +139,7 @@ final class ManagedEdition
         return $this->rememberClient($this->pantherClientFactory->createFirefox(
             $this->browserUri($origin),
             $options ?? BrowserOptions::create(),
+            $this->state->config->environment->cache->rootDirectory,
         ));
     }
 
@@ -147,6 +148,7 @@ final class ManagedEdition
         return $this->rememberClient($this->pantherClientFactory->createChrome(
             $this->browserUri($origin),
             $options ?? BrowserOptions::create(),
+            $this->state->config->environment->cache->rootDirectory,
         ));
     }
 
