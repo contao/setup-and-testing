@@ -12,6 +12,7 @@ declare(strict_types=1);
 
 namespace Contao\E2eTestBundle\Browser;
 
+use Contao\E2eTestBundle\Http\FreePortFinder;
 use Facebook\WebDriver\Chrome\ChromeOptions;
 use Facebook\WebDriver\Firefox\FirefoxOptions;
 use Symfony\Component\Panther\Client;
@@ -21,20 +22,22 @@ final readonly class PantherClientFactory
     public function __construct(
         private BrowserOptionsNormalizer $optionsNormalizer = new BrowserOptionsNormalizer(),
         private BrowserDriverManager $driverManager = new BrowserDriverManager(),
+        private FreePortFinder $portFinder = new FreePortFinder(),
     ) {
     }
 
     public function createFirefox(string $baseUri, BrowserOptions $options, string $workspace): Client
     {
         $driver = $this->driverManager->firefox($workspace);
+        $managerOptions = ['port' => $this->portFinder->find()];
 
         if (null === $options->acceptLanguage) {
-            return Client::createFirefoxClient($driver, null, [], $baseUri);
+            return Client::createFirefoxClient($driver, null, $managerOptions, $baseUri);
         }
 
         $arguments = $this->firefoxArguments();
         $firefoxOptions = $this->optionsNormalizer->forFirefox($options, $arguments);
-        $managerOptions = ['capabilities' => [FirefoxOptions::CAPABILITY => $firefoxOptions]];
+        $managerOptions['capabilities'] = [FirefoxOptions::CAPABILITY => $firefoxOptions];
 
         return Client::createFirefoxClient($driver, $arguments, $managerOptions, $baseUri);
     }
@@ -42,13 +45,14 @@ final readonly class PantherClientFactory
     public function createChrome(string $baseUri, BrowserOptions $options, string $workspace): Client
     {
         $driver = $this->driverManager->chrome($workspace);
+        $managerOptions = ['port' => $this->portFinder->find()];
 
         if (null === $options->acceptLanguage) {
-            return Client::createChromeClient($driver, null, [], $baseUri);
+            return Client::createChromeClient($driver, null, $managerOptions, $baseUri);
         }
 
         $chromeOptions = $this->optionsNormalizer->forChrome($options);
-        $managerOptions = ['capabilities' => [ChromeOptions::CAPABILITY => $chromeOptions]];
+        $managerOptions['capabilities'] = [ChromeOptions::CAPABILITY => $chromeOptions];
 
         return Client::createChromeClient($driver, null, $managerOptions, $baseUri);
     }

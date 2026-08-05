@@ -19,13 +19,15 @@ use Symfony\Component\Process\Process;
 
 final readonly class ServerManager
 {
-    public function __construct(private Filesystem $filesystem = new Filesystem())
-    {
+    public function __construct(
+        private Filesystem $filesystem = new Filesystem(),
+        private FreePortFinder $portFinder = new FreePortFinder(),
+    ) {
     }
 
     public function start(string $directory, string $databaseUrl, string $runtimeDirectory): ServerProcess
     {
-        $port = $this->findPort();
+        $port = $this->portFinder->find();
         $mappingFile = Path::join($runtimeDirectory, 'origins.json');
         $routerFile = Path::join($runtimeDirectory, 'router.php');
         $this->filesystem->mkdir($runtimeDirectory);
@@ -55,20 +57,6 @@ final readonly class ServerManager
         $this->waitUntilListening($process, $port);
 
         return new ServerProcess($process, $port, $mappingFile);
-    }
-
-    private function findPort(): int
-    {
-        $socket = stream_socket_server('tcp://127.0.0.1:0', $errorCode, $errorMessage);
-
-        if (false === $socket) {
-            throw new E2eTestException(\sprintf('Could not reserve a web server port: %s', $errorMessage));
-        }
-
-        $name = stream_socket_get_name($socket, false);
-        fclose($socket);
-
-        return (int) substr((string) $name, strrpos((string) $name, ':') + 1);
     }
 
     private function waitUntilListening(Process $process, int $port): void

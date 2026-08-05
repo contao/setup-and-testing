@@ -97,6 +97,26 @@ Without an origin, Panther uses the local E2E server URI directly so that absolu
 
 Each consumer project gets one ignored `.contao-e2e/` workspace. Dependency, application, and fixture fingerprints are separate: unchanged Composer input reuses `vendor/`; source or configuration changes rerun setup and migrations; fixture-only changes only reset and reload the database. Parallel processes acquire separate installation and database slots.
 
+Read-only tests with a data provider can avoid repeatedly loading an unchanged fixture set. `prepareDatabase($fixtures)` fingerprints the fixture contents and only resets the database when they change; repeated calls still discard browser clients, sessions, and mutable runtime caches. Use `resetDatabase()` instead whenever a test may have modified database state.
+
+Consumer projects can optionally run independent test-case classes in parallel with ParaTest. ParaTest is deliberately not a dependency of this bundle because its releases are closely coupled to PHPUnit versions. Install the version Composer selects for the project's PHPUnit version:
+
+```shell
+composer require --dev brianium/paratest
+```
+
+The installation and database pools isolate worker processes, and browser drivers use dynamically allocated ports. Keep data-provider cases in the same process by using ParaTest's default class-level runner rather than `--functional`:
+
+```shell
+XDEBUG_MODE=off vendor/bin/paratest \
+    --testsuite=e2e \
+    --processes=2 \
+    --cache-directory=.contao-e2e/cache/phpunit \
+    --tmp-dir=.contao-e2e/cache/paratest
+```
+
+Create `.contao-e2e/cache/paratest` before starting ParaTest, for example by running `vendor/bin/contao-e2e doctor --quiet`. Projects using Composer bin plugins may isolate ParaTest in a dedicated vendor-bin directory instead.
+
 Xdebug is disabled for Composer, setup, migration, and other managed subprocesses as well as for the E2E web server. The `BackendBrowser` submit helpers wait for the submitted form to be replaced, which works with Contao's Turbo navigation without Panther's full-document navigation delay.
 
 `ManagedEdition::resetDatabase()` returns a `FixtureResult`. Call `$result->value('page_home')` to obtain the generated primary key of a named fixture, or pass a second column name to read another resolved value. `$result->interpolate('/pages/{page_home}')` substitutes generated values in paths or other strings.

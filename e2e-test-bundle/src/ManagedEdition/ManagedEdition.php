@@ -33,6 +33,10 @@ final class ManagedEdition
 
     private Client|null $currentClient = null;
 
+    private string|null $preparedFixtureFingerprint = null;
+
+    private FixtureResult|null $preparedFixtureResult = null;
+
     public function __construct(
         private readonly ManagedEditionState $state,
         private readonly ServerManager $serverManager = new ServerManager(),
@@ -57,7 +61,9 @@ final class ManagedEdition
 
     public function resetDatabase(FixtureSet|null $fixtures = null): FixtureResult
     {
-        $this->quitClients();
+        $this->preparedFixtureFingerprint = null;
+        $this->preparedFixtureResult = null;
+        $this->resetRuntime();
         $fixtures ??= $this->state->config->recipe->fixtures;
 
         if (DatabaseResetMode::RECREATE_SCHEMA === $this->state->config->resetMode) {
@@ -65,10 +71,30 @@ final class ManagedEdition
             $this->state->console->migrate($this->directory(), $this->database()->applicationUrl());
         }
 
-        $result = $this->database()->reset($fixtures);
-        $this->clearMutableRuntime();
+        return $this->database()->reset($fixtures);
+    }
+
+    public function prepareDatabase(FixtureSet $fixtures): FixtureResult
+    {
+        $fingerprint = $this->fixtureFingerprint($fixtures);
+
+        if ($fingerprint === $this->preparedFixtureFingerprint && $this->preparedFixtureResult) {
+            $this->resetRuntime();
+
+            return $this->preparedFixtureResult;
+        }
+
+        $result = $this->resetDatabase($fixtures);
+        $this->preparedFixtureFingerprint = $fingerprint;
+        $this->preparedFixtureResult = $result;
 
         return $result;
+    }
+
+    public function resetRuntime(): void
+    {
+        $this->quitClients();
+        $this->clearMutableRuntime();
     }
 
     public function synchronizeFiles(string ...$paths): void
@@ -227,5 +253,16 @@ final class ManagedEdition
             Path::join($this->directory(), 'var/sessions'),
             Path::join($this->directory(), 'var/cache/prod/pools'),
         ]);
+    }
+
+    private function fixtureFingerprint(FixtureSet $fixtures): string
+    {
+        $hashes = [];
+
+        foreach ($fixtures->files as $file) {
+            $hashes[$file] = hash_file('sha256', $file);
+        }
+
+        return hash('sha256', serialize($hashes));
     }
 }
