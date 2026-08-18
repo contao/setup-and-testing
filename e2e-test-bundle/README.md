@@ -97,6 +97,8 @@ $backend = self::managedEdition()->createFirefoxBackendBrowser(options: $options
 // The same options work with createChromeBackendBrowser().
 ```
 
+Browser sessions are reused automatically between tests when the browser, origin, and startup options match. Before the database is reset, active sessions close additional windows, clear local and session storage, delete cookies, and navigate to a blank page. Calls within the same test still create independent clients, so tests can represent multiple simultaneous users. Sessions with different accepted languages remain separate because the language is a browser startup preference, and all retained sessions are closed with the Managed Edition after the test class.
+
 Firefox and Chrome drivers are provisioned automatically with BDI when they are not already available on `PATH`. Matching drivers are cached in `.contao-e2e/drivers`, so subsequent test runs do not download them again. Set `GITHUB_TOKEN` in CI if unauthenticated GitHub API rate limits affect geckodriver detection.
 
 Recipe file mappings copy files into the Managed Edition. Call `ManagedEdition::synchronizeFiles('files/path/example.jpg')` when a test also needs those files registered in Contao's DBAFS, for example before selecting them in a backend file-tree widget. With no path, the complete configured filesystem is synchronized.
@@ -105,7 +107,9 @@ Without an origin, Panther uses the local E2E server URI directly so that absolu
 
 Each consumer project gets one ignored `.contao-e2e/` workspace. Dependency, application, and fixture fingerprints are separate: unchanged Composer input reuses `vendor/`; source or configuration changes rerun setup and migrations; fixture-only changes only reset and reload the database. Parallel processes acquire separate installation and database slots.
 
-Read-only tests with a data provider can avoid repeatedly loading an unchanged fixture set. `prepareDatabase($fixtures)` fingerprints the fixture contents and only resets the database when they change; repeated calls still discard browser clients, sessions, and mutable runtime caches. Use `resetDatabase()` instead whenever a test may have modified database state.
+Path-package source fingerprints are cached for the lifetime of the PHPUnit process. Test code should not modify package source files while the suite is running; call `ProcessCachedSourceFingerprint::reset()` if a specialized test intentionally does so.
+
+Read-only tests with a data provider can avoid repeatedly loading an unchanged fixture set. `prepareDatabase($fixtures)` fingerprints the fixture contents and only resets the database when they change; repeated calls still clear active browser sessions and mutable runtime caches. Use `resetDatabase()` instead whenever a test may have modified database state.
 
 Consumer projects can optionally run independent test-case classes in parallel with ParaTest. ParaTest is deliberately not a dependency of this bundle because its releases are closely coupled to PHPUnit versions. Install the version Composer selects for the project's PHPUnit version:
 

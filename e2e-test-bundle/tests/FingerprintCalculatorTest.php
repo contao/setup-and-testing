@@ -13,6 +13,7 @@ declare(strict_types=1);
 namespace Contao\E2eTestBundle\Tests;
 
 use Contao\E2eTestBundle\Cache\FingerprintCalculator;
+use Contao\E2eTestBundle\Cache\SourceFingerprint;
 use Contao\E2eTestBundle\ManagedEdition\ManagedEditionConfig;
 use Contao\InstallationRecipe\Composer\ComposerConfig;
 use Contao\InstallationRecipe\Recipe\InstallationRecipe;
@@ -24,7 +25,7 @@ final class FingerprintCalculatorTest extends TestCase
     public function testSeparatesDependencyApplicationAndDataChanges(): void
     {
         $directory = $this->createInputDirectory();
-        $calculator = new FingerprintCalculator();
+        $calculator = new FingerprintCalculator(new SourceFingerprint());
         $initial = $calculator->calculate($this->config($directory));
 
         (new Filesystem())->dumpFile($directory.'/fixture.yaml', "example:\n  - id: 2\n");

@@ -24,6 +24,8 @@ class BrowserOptionsTest extends TestCase
 
         $this->assertNull($options->acceptLanguage);
         $this->assertSame('de-CH,de,en', $configuredOptions->acceptLanguage);
+        $this->assertSame('', $options->sessionKey());
+        $this->assertSame('de-CH,de,en', $configuredOptions->sessionKey());
     }
 
     public function testRejectsEmptyAcceptedLanguages(): void

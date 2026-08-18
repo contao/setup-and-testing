@@ -33,4 +33,9 @@ final readonly class BrowserOptions
 
         return new self($acceptLanguage);
     }
+
+    public function sessionKey(): string
+    {
+        return $this->acceptLanguage ?? '';
+    }
 }

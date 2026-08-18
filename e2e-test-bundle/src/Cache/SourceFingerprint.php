@@ -7,7 +7,7 @@ namespace Contao\E2eTestBundle\Cache;
 use Symfony\Component\Filesystem\Path;
 use Symfony\Component\Process\Process;
 
-final class SourceFingerprint
+final class SourceFingerprint implements SourceFingerprintInterface
 {
     public function calculate(string $path): string
     {

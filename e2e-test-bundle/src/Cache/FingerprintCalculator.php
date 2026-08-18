@@ -17,7 +17,7 @@ use Contao\InstallationRecipe\File\FileMapping;
 
 final readonly class FingerprintCalculator
 {
-    public function __construct(private SourceFingerprint $sourceFingerprint = new SourceFingerprint())
+    public function __construct(private SourceFingerprintInterface $sourceFingerprint = new ProcessCachedSourceFingerprint())
     {
     }
 

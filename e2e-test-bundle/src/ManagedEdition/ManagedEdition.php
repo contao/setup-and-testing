@@ -6,6 +6,7 @@ namespace Contao\E2eTestBundle\ManagedEdition;
 
 use Contao\E2eTestBundle\Browser\BackendBrowser;
 use Contao\E2eTestBundle\Browser\BrowserOptions;
+use Contao\E2eTestBundle\Browser\BrowserSessionResetter;
 use Contao\E2eTestBundle\Browser\PantherClientFactory;
 use Contao\E2eTestBundle\Database\DatabaseManager;
 use Contao\E2eTestBundle\Database\DatabaseResetMode;
@@ -15,6 +16,7 @@ use Contao\E2eTestBundle\Http\ServerManager;
 use Contao\E2eTestBundle\Http\ServerProcess;
 use Contao\InstallationRecipe\Fixture\FixtureResult;
 use Contao\InstallationRecipe\Fixture\FixtureSet;
+use Facebook\WebDriver\Exception\WebDriverException;
 use Symfony\Component\BrowserKit\HttpBrowser;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\Filesystem\Path;
@@ -27,9 +29,14 @@ final class ManagedEdition
     private ServerProcess|null $server = null;
 
     /**
-     * @var list<Client>
+     * @var list<array{client: Client, key: string}>
      */
     private array $clients = [];
+
+    /**
+     * @var array<string, list<Client>>
+     */
+    private array $reusableClients = [];
 
     private Client|null $currentClient = null;
 
@@ -37,11 +44,14 @@ final class ManagedEdition
 
     private FixtureResult|null $preparedFixtureResult = null;
 
+    private readonly BrowserSessionResetter $browserSessionResetter;
+
     public function __construct(
         private readonly ManagedEditionState $state,
         private readonly ServerManager $serverManager = new ServerManager(),
         private readonly PantherClientFactory $pantherClientFactory = new PantherClientFactory(),
     ) {
+        $this->browserSessionResetter = new BrowserSessionResetter();
     }
 
     public function __destruct()
@@ -93,8 +103,7 @@ final class ManagedEdition
 
     public function resetRuntime(): void
     {
-        $this->quitClients();
-        $this->clearMutableRuntime();
+        $this->resetRuntimeState();
     }
 
     public function synchronizeFiles(string ...$paths): void
@@ -162,20 +171,28 @@ final class ManagedEdition
 
     public function createFirefoxClient(Origin|null $origin = null, BrowserOptions|null $options = null): Client
     {
-        return $this->rememberClient($this->pantherClientFactory->createFirefox(
-            $this->browserUri($origin),
-            $options ?? BrowserOptions::create(),
+        $options ??= BrowserOptions::create();
+        $baseUri = $this->browserUri($origin);
+        $create = fn () => $this->pantherClientFactory->createFirefox(
+            $baseUri,
+            $options,
             $this->state->config->environment->cache->rootDirectory,
-        ));
+        );
+
+        return $this->reuseOrCreateClient($this->browserSessionKey('firefox', $baseUri, $options), $create);
     }
 
     public function createChromeClient(Origin|null $origin = null, BrowserOptions|null $options = null): Client
     {
-        return $this->rememberClient($this->pantherClientFactory->createChrome(
-            $this->browserUri($origin),
-            $options ?? BrowserOptions::create(),
+        $options ??= BrowserOptions::create();
+        $baseUri = $this->browserUri($origin);
+        $create = fn () => $this->pantherClientFactory->createChrome(
+            $baseUri,
+            $options,
             $this->state->config->environment->cache->rootDirectory,
-        ));
+        );
+
+        return $this->reuseOrCreateClient($this->browserSessionKey('chrome', $baseUri, $options), $create);
     }
 
     public function createFirefoxBackendBrowser(Origin|null $origin = null, BrowserOptions|null $options = null): BackendBrowser
@@ -200,20 +217,64 @@ final class ManagedEdition
     public function release(): void
     {
         $this->quitClients();
+        $this->quitReusableClients();
         $this->server?->stop();
         $this->server = null;
         $this->database()->close();
         $this->state->installation->lease->release();
     }
 
+    private function resetRuntimeState(): void
+    {
+        $this->recycleClients();
+        $this->clearMutableRuntime();
+    }
+
     private function quitClients(): void
     {
-        foreach ($this->clients as $client) {
-            $client->quit();
+        foreach ($this->clients as $entry) {
+            $this->quitClient($entry['client']);
         }
 
         $this->clients = [];
         $this->currentClient = null;
+    }
+
+    private function recycleClients(): void
+    {
+        foreach ($this->clients as $entry) {
+            $client = $entry['client'];
+
+            if ($this->browserSessionResetter->reset($client)) {
+                $this->reusableClients[$entry['key']][] = $client;
+            } else {
+                $this->quitClient($client);
+            }
+        }
+
+        $this->clients = [];
+        $this->currentClient = null;
+    }
+
+    private function quitReusableClients(): void
+    {
+        foreach ($this->reusableClients as $clients) {
+            foreach ($clients as $client) {
+                $this->quitClient($client);
+            }
+        }
+
+        $this->reusableClients = [];
+        $this->currentClient = null;
+    }
+
+    private function quitClient(Client $client): void
+    {
+        try {
+            $client->quit();
+        } catch (WebDriverException) {
+            // The browser or driver process has already stopped.
+        }
     }
 
     private function registerOrigin(Origin $origin): string
@@ -226,12 +287,40 @@ final class ManagedEdition
         return $alias;
     }
 
-    private function rememberClient(Client $client): Client
+    /**
+     * @param \Closure(): Client $create
+     */
+    private function reuseOrCreateClient(string $key, \Closure $create): Client
     {
-        $this->clients[] = $client;
+        $client = $this->takeReusableClient($key) ?? $create();
+        $this->clients[] = ['client' => $client, 'key' => $key];
         $this->currentClient = $client;
 
         return $client;
+    }
+
+    private function takeReusableClient(string $key): Client|null
+    {
+        if (!isset($this->reusableClients[$key])) {
+            return null;
+        }
+
+        $client = array_shift($this->reusableClients[$key]);
+
+        if (!$this->reusableClients[$key]) {
+            unset($this->reusableClients[$key]);
+        }
+
+        return $client;
+    }
+
+    private function browserSessionKey(string $browser, string $baseUri, BrowserOptions $options): string
+    {
+        return hash('sha256', implode("\0", [
+            $browser,
+            $baseUri,
+            $options->sessionKey(),
+        ]));
     }
 
     private function browserUri(Origin|null $origin): string
