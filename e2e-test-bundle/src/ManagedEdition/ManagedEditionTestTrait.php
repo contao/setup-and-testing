@@ -8,6 +8,8 @@ use PHPUnit\Framework\Assert;
 use PHPUnit\Framework\Attributes\AfterClass;
 use PHPUnit\Framework\Attributes\Before;
 use PHPUnit\Framework\Attributes\BeforeClass;
+use Playwright\Assertions\AssertionOptions;
+use Playwright\Assertions\Expect;
 
 trait ManagedEditionTestTrait
 {
@@ -34,14 +36,17 @@ trait ManagedEditionTestTrait
 
     public function assertSelectorExists(string $selector, string $message = ''): void
     {
-        Assert::assertGreaterThan(0, self::managedEdition()->currentClient()->getCrawler()->filter($selector)->count(), $message);
+        $locator = self::managedEdition()->currentPage()->locator($selector);
+        Expect::locator($locator->first())->toBeAttached(new AssertionOptions(message: $message ?: null));
+        Assert::assertGreaterThan(0, $locator->count(), $message);
     }
 
     public function assertSelectorTextContains(string $selector, string $text, string $message = ''): void
     {
-        $crawler = self::managedEdition()->currentClient()->getCrawler()->filter($selector);
-        Assert::assertGreaterThan(0, $crawler->count(), $message);
-        Assert::assertStringContainsString($text, $crawler->text(), $message);
+        $locator = self::managedEdition()->currentPage()->locator($selector);
+        Expect::locator($locator)->toContainText($text, new AssertionOptions(message: $message ?: null));
+        Assert::assertGreaterThan(0, $locator->count(), $message);
+        Assert::assertStringContainsString($text, $locator->first()->innerText(), $message);
     }
 
     abstract protected static function createManagedEditionConfig(): ManagedEditionConfig;

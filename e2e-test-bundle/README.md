@@ -1,6 +1,6 @@
 # Contao E2E test bundle
 
-`contao/e2e-test-bundle` prepares a real Contao Managed Edition, migrates an isolated MySQL/MariaDB database, loads installation recipes, and exposes raw HTTP and Panther clients. It does not require a Contao bundle itself, so the test suite selects the Contao version in its recipe.
+`contao/e2e-test-bundle` prepares a real Contao Managed Edition, migrates an isolated MySQL/MariaDB database, loads installation recipes, and exposes raw HTTP, BrowserKit, and Playwright clients. It does not require a Contao bundle itself, so the test suite selects the Contao version in its recipe.
 
 If Docker is available, no database setup is needed. The first test starts a reusable `mariadb:11.4` container on a random loopback port; subsequent runs reuse it. Its `/var/lib/mysql` directory is bind-mounted to `.contao-e2e/database/data`, so all generated database files remain inside the project-local E2E workspace.
 
@@ -32,7 +32,15 @@ The PowerShell equivalent on Windows is:
 $env:CONTAO_E2E_DATABASE_URL = 'mysql://root:password@127.0.0.1:3306'
 ```
 
-Windows is supported with native PHP and Composer. The automatic database requires Docker Desktop configured for Linux containers; alternatively, configure an existing MySQL or MariaDB server with `CONTAO_E2E_DATABASE_URL`. Composer creates Windows command proxies for `contao-e2e`, PHPUnit, Panther, and ParaTest, while the bundle invokes PHP, Composer, Git, Docker, and browser drivers without relying on a POSIX shell.
+Windows is supported with native PHP, Composer, and Node.js 20 or newer. The automatic database requires Docker Desktop configured for Linux containers. Alternatively, configure an existing MySQL or MariaDB server with `CONTAO_E2E_DATABASE_URL`. Composer creates Windows command proxies for `contao-e2e`, PHPUnit, Playwright, and ParaTest, while the bundle invokes PHP, Composer, Git, and Docker without relying on a POSIX shell.
+
+Install the Playwright browser binaries once after requiring the bundle:
+
+```shell
+vendor/bin/playwright-install --browsers
+```
+
+Use `vendor/bin/playwright-install --with-deps` on a fresh Linux CI runner to install the required system libraries as well. Playwright caches matching Chromium, Firefox, and WebKit binaries outside the project and reuses them between runs.
 
 Use the trait with PHPUnit 10 through 13; no test base class is imposed:
 
@@ -61,9 +69,8 @@ final class LoginTest extends TestCase
 
     public function testLoginPage(): void
     {
-        $backend = self::managedEdition()->createFirefoxBackendBrowser();
-        $client = $backend->client();
-        $client->request('GET', '/contao/login');
+        $backend = self::managedEdition()->createBackendBrowser();
+        $backend->visit('/contao/login');
         $backend->submitLogin('admin', 'password');
 
         $this->assertSelectorTextContains('body', 'Contao');
@@ -71,39 +78,46 @@ final class LoginTest extends TestCase
 }
 ```
 
-`BackendBrowser` wraps recurring Contao backend interactions without imposing another PHPUnit trait or base class. Chrome and Firefox variants are available from `ManagedEdition`; the underlying Panther client remains accessible through `client()` for arbitrary browser operations and assertions.
+`BackendBrowser` wraps recurring Contao backend interactions without imposing another PHPUnit trait or base class. Firefox is the default, while Chromium and WebKit are selected with `BrowserType`. The underlying Playwright page, context, and browser session remain accessible for arbitrary operations and assertions.
 
 ```php
-$backend = self::managedEdition()->createFirefoxBackendBrowser();
-$backend->client()->request('GET', '/contao/login');
+$backend = self::managedEdition()->createBackendBrowser();
+$backend->visit('/contao/login');
 $backend->submitLogin('admin', 'password');
 $backend->clickLink('Articles');
 $backend->submitNew();
 $backend->submitAction('Paste at the top');
-$backend->select('type', 'text');
+$backend->selectAndWaitForAjax('type', 'text');
 $backend->waitFor('textarea[name="text"]');
 $backend->fillRichText('text', 'Content created by an E2E test.');
 $backend->check('published');
 $backend->submitForm('Save and close', ['headline[value]' => 'Headline']);
 ```
 
+Dynamic Contao palettes finish asynchronously. Use `checkAndWaitForAjax()` or `selectAndWaitForAjax()` when changing a field causes Contao to rebuild part of the form. For extension-specific controls, `waitForAjax()` accepts the Playwright action that triggers the update:
+
+```php
+$backend->waitForAjax(
+    static fn () => $backend->page()->locator('[data-action="load-widget"]')->click(),
+);
+$backend->waitFor('#extension_widget');
+```
+
 The wrapper also supports buttons and operation links whose title starts with a translated label. `selectFile($field, $path, $expectedValue)` opens Contao's real modal file picker, expands nested directories, applies the selection, and optionally waits until the hidden widget value matches a known UUID.
 
-Use the browser-independent options object when a real browser request must exercise locale negotiation. It maps the accepted languages to the appropriate Firefox or Chrome preference:
+Use the browser-independent options object when a real browser request must exercise locale negotiation. It maps the accepted languages to an `Accept-Language` header for every browser engine:
 
 ```php
 $options = BrowserOptions::create()->withAcceptLanguage('de-CH,de,en');
-$backend = self::managedEdition()->createFirefoxBackendBrowser(options: $options);
-// The same options work with createChromeBackendBrowser().
+$backend = self::managedEdition()->createBackendBrowser(options: $options);
+// The header works with Chromium, Firefox, and WebKit.
 ```
 
-Browser sessions are reused automatically between tests when the browser, origin, and startup options match. Before the database is reset, active sessions close additional windows, clear local and session storage, delete cookies, and navigate to a blank page. Calls within the same test still create independent clients, so tests can represent multiple simultaneous users. Sessions with different accepted languages remain separate because the language is a browser startup preference, and all retained sessions are closed with the Managed Edition after the test class.
-
-Firefox and Chrome drivers are provisioned automatically with BDI when they are not already available on `PATH`. Matching drivers are cached in `.contao-e2e/drivers`, so subsequent test runs do not download them again. Set `GITHUB_TOKEN` in CI if unauthenticated GitHub API rate limits affect geckodriver detection.
+The Playwright process and launched browser engine are reused for the test class. Every call to `createBrowser()` or `createBackendBrowser()` creates a cheap, isolated browser context with independent cookies and storage, so tests can represent multiple simultaneous users. Active contexts are closed before the database is reset, while the browser process remains available for the next test.
 
 Recipe file mappings copy files into the Managed Edition. Call `ManagedEdition::synchronizeFiles('files/path/example.jpg')` when a test also needs those files registered in Contao's DBAFS, for example before selecting them in a backend file-tree widget. With no path, the complete configured filesystem is synchronized.
 
-Without an origin, Panther uses the local E2E server URI directly so that absolute redirects and cookies stay on the same browser origin. Pass `Origin::http('example.test')` or `Origin::https('example.test')` when a test must emulate a page DNS entry or HTTPS; the server maps that origin without requiring a real domain or certificate.
+Without an origin, Playwright uses the local E2E server URI directly so that absolute redirects and cookies stay on the same browser origin. Pass `Origin::http('example.test')` or `Origin::https('example.test')` when a test must emulate a page DNS entry or HTTPS. The server maps that origin without requiring a real domain or certificate.
 
 Each consumer project gets one ignored `.contao-e2e/` workspace. Dependency, application, and fixture fingerprints are separate: unchanged Composer input reuses `vendor/`; source or configuration changes rerun setup and migrations; fixture-only changes only reset and reload the database. Parallel processes acquire separate installation and database slots.
 
@@ -117,7 +131,7 @@ Consumer projects can optionally run independent test-case classes in parallel w
 composer require --dev brianium/paratest
 ```
 
-The installation and database pools isolate worker processes, and browser drivers use dynamically allocated ports. Keep data-provider cases in the same process by using ParaTest's default class-level runner rather than `--functional`:
+The installation and database pools isolate worker processes, and every worker gets its own Playwright process. Keep data-provider cases in the same process by using ParaTest's default class-level runner rather than `--functional`:
 
 ```shell
 XDEBUG_MODE=off vendor/bin/paratest \
@@ -135,7 +149,7 @@ $env:XDEBUG_MODE = 'off'; vendor\bin\paratest --testsuite=e2e --processes=2 --ca
 
 Create `.contao-e2e/cache/paratest` before starting ParaTest, for example by running `vendor/bin/contao-e2e doctor --quiet`. Projects using Composer bin plugins may isolate ParaTest in a dedicated vendor-bin directory instead.
 
-Xdebug is disabled for Composer, setup, migration, and other managed subprocesses as well as for the E2E web server. The `BackendBrowser` submit helpers wait for the submitted form to be replaced, which works with Contao's Turbo navigation without Panther's full-document navigation delay.
+Xdebug is disabled for Composer, setup, migration, and other managed subprocesses as well as for the E2E web server. Playwright locators automatically wait for actionable elements and work with Contao's Turbo navigation without manual sleeps.
 
 `ManagedEdition::resetDatabase()` returns a `FixtureResult`. Call `$result->value('page_home')` to obtain the generated primary key of a named fixture, or pass a second column name to read another resolved value. `$result->interpolate('/pages/{page_home}')` substitutes generated values in paths or other strings.
 

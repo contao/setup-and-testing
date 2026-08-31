@@ -24,8 +24,17 @@ class BrowserOptionsTest extends TestCase
 
         $this->assertNull($options->acceptLanguage);
         $this->assertSame('de-CH,de,en', $configuredOptions->acceptLanguage);
-        $this->assertSame('', $options->sessionKey());
-        $this->assertSame('de-CH,de,en', $configuredOptions->sessionKey());
+    }
+
+    public function testConfiguresViewportWithoutMutatingTheOriginalOptions(): void
+    {
+        $options = BrowserOptions::create();
+        $configuredOptions = $options->withViewport(1440, 1200);
+
+        $this->assertNull($options->viewportWidth);
+        $this->assertNull($options->viewportHeight);
+        $this->assertSame(1440, $configuredOptions->viewportWidth);
+        $this->assertSame(1200, $configuredOptions->viewportHeight);
     }
 
     public function testRejectsEmptyAcceptedLanguages(): void
@@ -33,5 +42,12 @@ class BrowserOptionsTest extends TestCase
         $this->expectException(\InvalidArgumentException::class);
 
         BrowserOptions::create()->withAcceptLanguage('  ');
+    }
+
+    public function testRejectsInvalidViewport(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+
+        BrowserOptions::create()->withViewport(0, 1200);
     }
 }

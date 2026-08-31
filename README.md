@@ -3,7 +3,7 @@
 This monorepo develops two packages on a shared version line that is independent of Contao core. They provide the building blocks required to create reproducible Contao installations:
 
 - [`contao/installation-recipe`](installation-recipe/) describes Composer requirements, configuration fragments, relational database fixtures, and project files without depending on Contao or a test framework.
-- [`contao/e2e-test-bundle`](e2e-test-bundle/) turns such a recipe into an isolated Contao Managed Edition with a migrated database, reusable installation cache, web server, BrowserKit, and Panther clients.
+- [`contao/e2e-test-bundle`](e2e-test-bundle/) turns such a recipe into an isolated Contao Managed Edition with a migrated database, reusable installation cache, web server, BrowserKit, and Playwright clients.
 
 The packages live together because the E2E runtime is a direct consumer of installation recipes and changes can be tested atomically. They are released from this repository independently of `contao/contao`. This lets recipes evolve for non-testing use cases such as theme import, while the E2E bundle can test any supported Contao version selected by the consuming project.
 

@@ -6,8 +6,9 @@ namespace Contao\E2eTestBundle\ManagedEdition;
 
 use Contao\E2eTestBundle\Browser\BackendBrowser;
 use Contao\E2eTestBundle\Browser\BrowserOptions;
-use Contao\E2eTestBundle\Browser\BrowserSessionResetter;
-use Contao\E2eTestBundle\Browser\PantherClientFactory;
+use Contao\E2eTestBundle\Browser\BrowserSession;
+use Contao\E2eTestBundle\Browser\BrowserType;
+use Contao\E2eTestBundle\Browser\PlaywrightManager;
 use Contao\E2eTestBundle\Database\DatabaseManager;
 use Contao\E2eTestBundle\Database\DatabaseResetMode;
 use Contao\E2eTestBundle\Http\HttpRequest;
@@ -16,12 +17,11 @@ use Contao\E2eTestBundle\Http\ServerManager;
 use Contao\E2eTestBundle\Http\ServerProcess;
 use Contao\InstallationRecipe\Fixture\FixtureResult;
 use Contao\InstallationRecipe\Fixture\FixtureSet;
-use Facebook\WebDriver\Exception\WebDriverException;
+use Playwright\Page\PageInterface;
 use Symfony\Component\BrowserKit\HttpBrowser;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\Filesystem\Path;
 use Symfony\Component\HttpClient\HttpClient;
-use Symfony\Component\Panther\Client;
 use Symfony\Contracts\HttpClient\ResponseInterface;
 
 final class ManagedEdition
@@ -29,29 +29,21 @@ final class ManagedEdition
     private ServerProcess|null $server = null;
 
     /**
-     * @var list<array{client: Client, key: string}>
+     * @var list<BrowserSession>
      */
-    private array $clients = [];
+    private array $browserSessions = [];
 
-    /**
-     * @var array<string, list<Client>>
-     */
-    private array $reusableClients = [];
-
-    private Client|null $currentClient = null;
+    private BrowserSession|null $currentBrowser = null;
 
     private string|null $preparedFixtureFingerprint = null;
 
     private FixtureResult|null $preparedFixtureResult = null;
 
-    private readonly BrowserSessionResetter $browserSessionResetter;
-
     public function __construct(
         private readonly ManagedEditionState $state,
         private readonly ServerManager $serverManager = new ServerManager(),
-        private readonly PantherClientFactory $pantherClientFactory = new PantherClientFactory(),
+        private readonly PlaywrightManager $playwrightManager = new PlaywrightManager(),
     ) {
-        $this->browserSessionResetter = new BrowserSessionResetter();
     }
 
     public function __destruct()
@@ -169,55 +161,34 @@ final class ManagedEdition
         return $browser;
     }
 
-    public function createFirefoxClient(Origin|null $origin = null, BrowserOptions|null $options = null): Client
+    public function createBrowser(BrowserType $type = BrowserType::Firefox, Origin|null $origin = null, BrowserOptions|null $options = null): BrowserSession
     {
         $options ??= BrowserOptions::create();
-        $baseUri = $this->browserUri($origin);
-        $create = fn () => $this->pantherClientFactory->createFirefox(
-            $baseUri,
-            $options,
-            $this->state->config->environment->cache->rootDirectory,
-        );
+        $browser = $this->playwrightManager->create($type, $this->browserUri($origin), $options);
+        $this->browserSessions[] = $browser;
+        $this->currentBrowser = $browser;
 
-        return $this->reuseOrCreateClient($this->browserSessionKey('firefox', $baseUri, $options), $create);
+        return $browser;
     }
 
-    public function createChromeClient(Origin|null $origin = null, BrowserOptions|null $options = null): Client
+    public function createBackendBrowser(BrowserType $type = BrowserType::Firefox, Origin|null $origin = null, BrowserOptions|null $options = null): BackendBrowser
     {
-        $options ??= BrowserOptions::create();
-        $baseUri = $this->browserUri($origin);
-        $create = fn () => $this->pantherClientFactory->createChrome(
-            $baseUri,
-            $options,
-            $this->state->config->environment->cache->rootDirectory,
-        );
-
-        return $this->reuseOrCreateClient($this->browserSessionKey('chrome', $baseUri, $options), $create);
+        return new BackendBrowser($this->createBrowser($type, $origin, $options));
     }
 
-    public function createFirefoxBackendBrowser(Origin|null $origin = null, BrowserOptions|null $options = null): BackendBrowser
+    public function currentPage(): PageInterface
     {
-        return new BackendBrowser($this->createFirefoxClient($origin, $options));
-    }
-
-    public function createChromeBackendBrowser(Origin|null $origin = null, BrowserOptions|null $options = null): BackendBrowser
-    {
-        return new BackendBrowser($this->createChromeClient($origin, $options));
-    }
-
-    public function currentClient(): Client
-    {
-        if (!$this->currentClient) {
-            throw new \LogicException('Create a Panther client before using selector assertions.');
+        if (!$this->currentBrowser) {
+            throw new \LogicException('Create a Playwright browser before using selector assertions.');
         }
 
-        return $this->currentClient;
+        return $this->currentBrowser->page();
     }
 
     public function release(): void
     {
-        $this->quitClients();
-        $this->quitReusableClients();
+        $this->closeBrowserSessions();
+        $this->playwrightManager->close();
         $this->server?->stop();
         $this->server = null;
         $this->database()->close();
@@ -226,55 +197,18 @@ final class ManagedEdition
 
     private function resetRuntimeState(): void
     {
-        $this->recycleClients();
+        $this->closeBrowserSessions();
         $this->clearMutableRuntime();
     }
 
-    private function quitClients(): void
+    private function closeBrowserSessions(): void
     {
-        foreach ($this->clients as $entry) {
-            $this->quitClient($entry['client']);
+        foreach ($this->browserSessions as $browser) {
+            $browser->close();
         }
 
-        $this->clients = [];
-        $this->currentClient = null;
-    }
-
-    private function recycleClients(): void
-    {
-        foreach ($this->clients as $entry) {
-            $client = $entry['client'];
-
-            if ($this->browserSessionResetter->reset($client)) {
-                $this->reusableClients[$entry['key']][] = $client;
-            } else {
-                $this->quitClient($client);
-            }
-        }
-
-        $this->clients = [];
-        $this->currentClient = null;
-    }
-
-    private function quitReusableClients(): void
-    {
-        foreach ($this->reusableClients as $clients) {
-            foreach ($clients as $client) {
-                $this->quitClient($client);
-            }
-        }
-
-        $this->reusableClients = [];
-        $this->currentClient = null;
-    }
-
-    private function quitClient(Client $client): void
-    {
-        try {
-            $client->quit();
-        } catch (WebDriverException) {
-            // The browser or driver process has already stopped.
-        }
+        $this->browserSessions = [];
+        $this->currentBrowser = null;
     }
 
     private function registerOrigin(Origin $origin): string
@@ -285,42 +219,6 @@ final class ManagedEdition
         (new Filesystem())->dumpFile($this->server->mappingFile, json_encode($mapping, JSON_PRETTY_PRINT | JSON_THROW_ON_ERROR));
 
         return $alias;
-    }
-
-    /**
-     * @param \Closure(): Client $create
-     */
-    private function reuseOrCreateClient(string $key, \Closure $create): Client
-    {
-        $client = $this->takeReusableClient($key) ?? $create();
-        $this->clients[] = ['client' => $client, 'key' => $key];
-        $this->currentClient = $client;
-
-        return $client;
-    }
-
-    private function takeReusableClient(string $key): Client|null
-    {
-        if (!isset($this->reusableClients[$key])) {
-            return null;
-        }
-
-        $client = array_shift($this->reusableClients[$key]);
-
-        if (!$this->reusableClients[$key]) {
-            unset($this->reusableClients[$key]);
-        }
-
-        return $client;
-    }
-
-    private function browserSessionKey(string $browser, string $baseUri, BrowserOptions $options): string
-    {
-        return hash('sha256', implode("\0", [
-            $browser,
-            $baseUri,
-            $options->sessionKey(),
-        ]));
     }
 
     private function browserUri(Origin|null $origin): string

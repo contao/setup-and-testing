@@ -14,48 +14,16 @@ namespace Contao\E2eTestBundle\Browser;
 
 enum BrowserType
 {
+    case Chromium;
     case Firefox;
-    case Chrome;
+    case WebKit;
 
-    public function driverFilename(): string
-    {
-        $filename = match ($this) {
-            self::Firefox => 'geckodriver',
-            self::Chrome => 'chromedriver',
-        };
-
-        return 'Windows' === PHP_OS_FAMILY ? $filename.'.exe' : $filename;
-    }
-
-    public function installCommand(string|null $browserPath): string
+    public function value(): string
     {
         return match ($this) {
-            self::Firefox => 'browser:firefox',
-            self::Chrome => $browserPath && str_contains(strtolower($browserPath), 'chromium')
-                ? 'browser:chromium'
-                : 'browser:google-chrome',
+            self::Chromium => 'chromium',
+            self::Firefox => 'firefox',
+            self::WebKit => 'webkit',
         };
-    }
-
-    public function browserBinary(): string|null
-    {
-        $variable = match ($this) {
-            self::Firefox => 'PANTHER_FIREFOX_BINARY',
-            self::Chrome => 'PANTHER_CHROME_BINARY',
-        };
-        $path = $_SERVER[$variable] ?? null;
-
-        return \is_string($path) && '' !== $path ? $path : null;
-    }
-
-    public function installerBrowserPath(): string|null
-    {
-        $path = $this->browserBinary();
-
-        if ('Darwin' === PHP_OS_FAMILY && null !== $path && preg_match('#^(.+?\.app)(?:/|$)#', $path, $match)) {
-            return $match[1];
-        }
-
-        return $path;
     }
 }

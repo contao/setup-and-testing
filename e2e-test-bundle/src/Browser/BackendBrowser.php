@@ -12,36 +12,41 @@ declare(strict_types=1);
 
 namespace Contao\E2eTestBundle\Browser;
 
-use Facebook\WebDriver\WebDriverBy;
-use Facebook\WebDriver\WebDriverExpectedCondition;
-use Facebook\WebDriver\WebDriverKeys;
-use Facebook\WebDriver\WebDriverSelect;
-use Symfony\Component\Panther\Client;
-use Symfony\Component\Panther\DomCrawler\Form;
+use Playwright\Frame\FrameLocatorInterface;
+use Playwright\Locator\LocatorInterface;
+use Playwright\Page\PageInterface;
 
 final readonly class BackendBrowser
 {
-    public function __construct(private Client $client)
+    public function __construct(private BrowserSession $browser)
     {
     }
 
-    public function client(): Client
+    public function browser(): BrowserSession
     {
-        return $this->client;
+        return $this->browser;
+    }
+
+    public function page(): PageInterface
+    {
+        return $this->browser->page();
+    }
+
+    public function visit(string $path): void
+    {
+        $this->browser->visit($path);
     }
 
     public function waitFor(string $selector): void
     {
-        $this->client->waitFor($selector);
+        $this->page()->locator($selector)->waitFor(['state' => 'attached']);
     }
 
     public function submitLogin(string $username, string $password): void
     {
-        $form = $this->client->getCrawler()->filter('button[name="login"]')->form([
-            'username' => $username,
-            'password' => $password,
-        ]);
-        $this->submit($form);
+        $this->page()->locator('[name="username"]')->fill($username);
+        $this->page()->locator('[name="password"]')->fill($password);
+        $this->navigate(fn () => $this->page()->locator('button[name="login"]')->click());
     }
 
     /**
@@ -50,167 +55,199 @@ final readonly class BackendBrowser
     public function submitForm(string $button, array $values = []): void
     {
         $this->waitForBackend();
-        $buttons = $this->client->getCrawler()->filter('button, input[type="submit"]');
 
-        foreach ($buttons as $index => $element) {
-            $label = trim($element->getText()) ?: (string) $element->getAttribute('value');
-
-            if ($button === $label && $element->isDisplayed()) {
-                $this->submit($buttons->eq($index)->form($values));
-
-                return;
-            }
+        foreach ($values as $field => $value) {
+            $this->fillField($field, $value);
         }
 
-        throw new \LogicException(\sprintf('Could not find a visible submit button labeled "%s".', $button));
+        $button = $this->visible(
+            $this->page()->getByRole('button', ['name' => $button, 'exact' => true]),
+            \sprintf('submit button labeled "%s"', $button),
+        );
+        $this->navigate(static fn () => $button->click());
     }
 
     public function submitNew(): void
     {
         $this->waitForBackend();
-        $action = $this->client->waitFor('.header_new')->filter('.header_new');
-        $element = $action->getElement(0);
-
-        if ('a' === $element->getTagName()) {
-            $this->client->request('GET', (string) $element->getAttribute('href'));
-
-            return;
-        }
-
-        $this->submit($action->form());
+        $action = $this->visible($this->page()->locator('.header_new'), 'new record action');
+        $this->navigate(static fn () => $action->click());
     }
 
     public function submitAction(string $label): void
     {
         $this->waitForBackend();
-        $buttons = $this->client->getCrawler()->filter('button[type="submit"]');
 
-        foreach ($buttons as $index => $element) {
-            $button = $buttons->eq($index);
-            $image = $button->filter('img[alt]');
-            $descriptions = [
-                trim($element->getText()),
-                (string) $element->getAttribute('title'),
-                $image->count() ? (string) $image->attr('alt') : '',
-            ];
-
-            if ($element->isDisplayed() && str_contains(implode("\0", $descriptions), $label)) {
-                $this->submit($button->form());
+        foreach ($this->page()->locator('button[type="submit"]')->all() as $button) {
+            if ($button->isVisible() && $this->buttonMatches($button, $label)) {
+                $this->navigate(static fn () => $button->click());
 
                 return;
             }
         }
 
-        throw new \LogicException(\sprintf('Could not find a submit action labeled "%s".', $label));
+        throw new \LogicException(\sprintf('Could not find a visible submit action labeled "%s".', $label));
     }
 
     public function check(string $field): void
     {
-        $this->waitForBackend();
-        $checkboxes = $this->client->getCrawler()->filter(\sprintf('input[name="%s"][type="checkbox"]', $field));
+        $this->checkbox($field)->check();
+    }
 
-        foreach ($checkboxes as $checkbox) {
-            if ($checkbox->isDisplayed()) {
-                $checkbox->sendKeys(WebDriverKeys::SPACE);
-
-                if (!$checkbox->isSelected()) {
-                    throw new \LogicException(\sprintf('Could not check the "%s" checkbox.', $field));
-                }
-
-                $this->client->refreshCrawler();
-
-                return;
-            }
-        }
-
-        throw new \LogicException(\sprintf('Could not find the "%s" checkbox.', $field));
+    public function checkAndWaitForAjax(string $field): void
+    {
+        $checkbox = $this->checkbox($field);
+        $this->waitForAjax(static fn () => $checkbox->check());
     }
 
     public function select(string $field, string $value): void
     {
-        $this->waitForBackend();
-        $select = $this->client->getCrawler()->filter(\sprintf('select[name="%s"]', $field));
+        $this->selectField($field)->selectOption($value);
+    }
 
-        if (!$select->count()) {
-            throw new \LogicException(\sprintf('Could not find the "%s" select.', $field));
+    public function selectAndWaitForAjax(string $field, string $value): void
+    {
+        $select = $this->selectField($field);
+
+        if ($value === $select->inputValue()) {
+            return;
         }
 
-        new WebDriverSelect($select->getElement(0))->selectByValue($value);
-        $this->client->refreshCrawler();
+        $this->waitForAjax(static fn () => $select->selectOption($value));
+    }
+
+    /**
+     * @param callable(): mixed $action
+     */
+    public function waitForAjax(callable $action): void
+    {
+        $marker = '__contaoE2eAjax'.bin2hex(random_bytes(8));
+        $this->page()->evaluate(\sprintf(
+            '(() => { window.addEvent("ajax_change", () => window[%1$s] = true); return null; })()',
+            json_encode($marker, JSON_THROW_ON_ERROR),
+        ));
+        $action();
+        $this->page()->waitForFunction('(marker) => window[marker] === true', $marker);
     }
 
     public function clickLink(string $label): void
     {
-        $selector = WebDriverBy::xpath(\sprintf('//a[normalize-space(.)=%s]', $this->xpathLiteral($label)));
-        $link = $this->client->wait()->until(WebDriverExpectedCondition::visibilityOfElementLocated($selector));
-        $this->client->request('GET', (string) $link->getAttribute('href'));
+        $link = $this->visible(
+            $this->page()->getByRole('link', ['name' => $label, 'exact' => true]),
+            \sprintf('link labeled "%s"', $label),
+        );
+        $this->navigate(static fn () => $link->click());
     }
 
     public function clickButton(string $selector): void
     {
         $this->waitForBackend();
-        $button = $this->client->waitForVisibility($selector)->filter($selector);
-        $button->getElement(0)->click();
-        $this->client->refreshCrawler();
+        $this->visible($this->page()->locator($selector), \sprintf('button matching "%s"', $selector))->click();
     }
 
     public function clickTitlePrefix(string $title): void
     {
         $this->waitForBackend();
         $selector = \sprintf('a[title^="%s"]', $this->escapeCssString($title));
-        $link = $this->client->waitFor($selector)->filter($selector)->getElement(0);
-        $this->client->request('GET', (string) $link->getAttribute('href'));
+        $link = $this->page()->locator($selector)->first();
+        $link->waitFor(['state' => 'attached']);
+
+        $href = $link->getAttribute('href');
+
+        if (null === $href) {
+            throw new \LogicException(\sprintf('The link whose title starts with "%s" has no target.', $title));
+        }
+
+        $this->browser->visit($href);
     }
 
     public function fillRichText(string $field, string $text): void
     {
         $this->waitForBackend();
-        $driver = $this->client->getWebDriver();
-        $frame = $this->client->wait()->until(WebDriverExpectedCondition::presenceOfElementLocated(
-            WebDriverBy::id('ctrl_'.$field.'_ifr'),
-        ));
-        $driver->switchTo()->frame($frame);
-        $editor = $this->client->wait()->until(WebDriverExpectedCondition::elementToBeClickable(
-            WebDriverBy::id('tinymce'),
-        ));
-        $editor->clear();
-        $editor->sendKeys($text);
-        $driver->switchTo()->defaultContent();
-        $this->client->refreshCrawler();
+        $this->page()->frameLocator('#ctrl_'.$field.'_ifr')->locator('#tinymce')->fill($text);
     }
 
     public function selectFile(string $field, string $path, string|null $expectedValue = null): void
     {
         $this->waitForBackend();
-        $driver = $this->client->getWebDriver();
-        $driver->findElement(WebDriverBy::id('ft_'.$field))->click();
-        $frame = $this->client->wait()->until(WebDriverExpectedCondition::presenceOfElementLocated(
-            WebDriverBy::cssSelector('iframe[name="simple-modal-iframe"]'),
-        ));
-        $driver->switchTo()->frame($frame);
-        $this->expandFileTree(\dirname($path));
-        $this->client->wait()->until(WebDriverExpectedCondition::elementToBeClickable(
-            WebDriverBy::cssSelector(\sprintf('input[type="radio"][value="%s"]', $this->escapeCssString($path))),
-        ))->click();
-        $driver->switchTo()->defaultContent();
-        $this->client->wait()->until(WebDriverExpectedCondition::elementToBeClickable(
-            WebDriverBy::cssSelector('.simple-modal .btn.primary'),
-        ))->click();
+        $triggerSelector = '#ft_'.$field;
+        $trigger = $this->page()->locator($triggerSelector);
+        $trigger->waitForFunction('(element) => element.hasEvent?.("click") === true');
+
+        $frameSelector = 'iframe[name="simple-modal-iframe"]';
+        $trigger->click();
+        $frame = $this->page()->frameLocator($frameSelector);
+        $frame->locator('#tl_listing')->waitFor(['state' => 'attached']);
+        $this->expandFileTree($frame, \dirname($path));
+        $selector = \sprintf('input[type="radio"][value="%s"]', $this->escapeCssString($path));
+        $frame->locator($selector)->click();
+        $this->page()->locator('.simple-modal .btn.primary')->click();
         $this->waitForFileSelection($field, $expectedValue);
-        $this->client->refreshCrawler();
     }
 
-    private function expandFileTree(string $directory): void
+    private function fillField(string $field, string $value): void
+    {
+        $selector = \sprintf('[name="%s"]', $this->escapeCssString($field));
+        $input = $this->visible($this->page()->locator($selector), \sprintf('field named "%s"', $field));
+        $tagName = $input->evaluate('(element) => element.tagName.toLowerCase()');
+
+        if ('select' === $tagName) {
+            $input->selectOption($value);
+        } else {
+            $input->fill($value);
+        }
+    }
+
+    private function checkbox(string $field): LocatorInterface
+    {
+        $selector = \sprintf('input[name="%s"][type="checkbox"]', $this->escapeCssString($field));
+
+        return $this->visible($this->page()->locator($selector), \sprintf('"%s" checkbox', $field));
+    }
+
+    private function selectField(string $field): LocatorInterface
+    {
+        $selector = \sprintf('select[name="%s"]', $this->escapeCssString($field));
+
+        return $this->visible($this->page()->locator($selector), \sprintf('"%s" select', $field));
+    }
+
+    private function buttonMatches(LocatorInterface $button, string $label): bool
+    {
+        $image = $button->locator('img[alt]');
+        $descriptions = [
+            trim($button->innerText()),
+            (string) $button->getAttribute('title'),
+            $image->count() ? (string) $image->first()->getAttribute('alt') : '',
+        ];
+
+        return str_contains(implode("\0", $descriptions), $label);
+    }
+
+    private function visible(LocatorInterface $locator, string $description): LocatorInterface
+    {
+        $locator->first()->waitFor(['state' => 'attached']);
+
+        foreach ($locator->all() as $match) {
+            if ($match->isVisible()) {
+                return $match;
+            }
+        }
+
+        throw new \LogicException(\sprintf('Could not find a visible %s at "%s" (%d matches).', $description, $this->page()->url(), $locator->count()));
+    }
+
+    private function expandFileTree(FrameLocatorInterface $frame, string $directory): void
     {
         $parts = explode('/', $directory);
 
         for ($i = 2; $i <= \count($parts); ++$i) {
             $path = implode('/', \array_slice($parts, 0, $i));
-            $selector = WebDriverBy::cssSelector(\sprintf('li[data-id="%s"] a.foldable', $this->escapeCssString($path)));
-            $folder = $this->client->wait()->until(WebDriverExpectedCondition::presenceOfElementLocated($selector));
+            $selector = \sprintf('li[data-id="%s"] a.foldable', $this->escapeCssString($path));
+            $folder = $frame->locator($selector);
 
             if (!str_contains((string) $folder->getAttribute('class'), 'foldable--open')) {
-                $this->client->wait()->until(WebDriverExpectedCondition::elementToBeClickable($selector))->click();
+                $folder->click();
             }
         }
     }
@@ -218,24 +255,32 @@ final readonly class BackendBrowser
     private function waitForFileSelection(string $field, string|null $expectedValue): void
     {
         if (null === $expectedValue) {
-            $this->client->waitForInvisibility('.simple-modal');
+            $this->page()->locator('.simple-modal')->waitFor(['state' => 'hidden']);
 
             return;
         }
 
-        $this->client->wait()->until(WebDriverExpectedCondition::elementValueContains(
-            WebDriverBy::id('ctrl_'.$field),
+        $this->page()->locator('#ctrl_'.$field)->waitForFunction(
+            '(element, expected) => element.value.includes(expected)',
             $expectedValue,
-        ));
+        );
     }
 
-    private function submit(Form $form): void
+    /**
+     * @param callable(): void $action
+     */
+    private function navigate(callable $action): void
     {
-        $element = $form->getElement();
-        $button = $form->getButton();
-        !$button ? $element->submit() : $button->click();
-        $this->client->wait()->until(WebDriverExpectedCondition::stalenessOf($element));
-        $this->client->refreshCrawler();
+        $marker = bin2hex(random_bytes(8));
+        $this->page()->locator('body')->evaluate(
+            '(element, marker) => element.dataset.contaoE2eNavigation = marker',
+            $marker,
+        );
+        $action();
+        $this->page()->waitForFunction(
+            '(marker) => document.body?.dataset.contaoE2eNavigation !== marker',
+            $marker,
+        );
     }
 
     private function escapeCssString(string $value): string
@@ -245,19 +290,6 @@ final readonly class BackendBrowser
 
     private function waitForBackend(): void
     {
-        $this->client->waitFor('body.js');
-    }
-
-    private function xpathLiteral(string $value): string
-    {
-        if (!str_contains($value, "'")) {
-            return "'".$value."'";
-        }
-
-        if (!str_contains($value, '"')) {
-            return '"'.$value.'"';
-        }
-
-        return "concat('".implode("', \"'\", '", explode("'", $value))."')";
+        $this->page()->locator('body.js')->waitFor();
     }
 }

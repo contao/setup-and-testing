@@ -12,40 +12,26 @@ declare(strict_types=1);
 
 namespace Contao\E2eTestBundle\Browser;
 
-use Facebook\WebDriver\Chrome\ChromeOptions;
-use Facebook\WebDriver\Firefox\FirefoxOptions;
-
 final readonly class BrowserOptionsNormalizer
 {
     /**
-     * @param list<string> $arguments
+     * @return array<string, mixed>
      */
-    public function forFirefox(BrowserOptions $options, array $arguments): FirefoxOptions
+    public function normalize(BrowserOptions $options): array
     {
-        $firefoxOptions = new FirefoxOptions();
-        $firefoxOptions->addArguments($arguments);
-        $firefoxOptions->setPreference('intl.accept_languages', $options->acceptLanguage ?? '');
-        $firefoxOptions->setPreference('ui.prefersReducedMotion', $this->reducedMotionPreference());
+        $normalized = [];
 
-        if (isset($_SERVER['PANTHER_FIREFOX_BINARY'])) {
-            $firefoxOptions->setOption('binary', $_SERVER['PANTHER_FIREFOX_BINARY']);
+        if (null !== $options->acceptLanguage) {
+            $normalized['extraHTTPHeaders'] = ['Accept-Language' => $options->acceptLanguage];
         }
 
-        return $firefoxOptions;
-    }
+        if (null !== $options->viewportWidth && null !== $options->viewportHeight) {
+            $normalized['viewport'] = [
+                'width' => $options->viewportWidth,
+                'height' => $options->viewportHeight,
+            ];
+        }
 
-    public function forChrome(BrowserOptions $options): ChromeOptions
-    {
-        $chromeOptions = new ChromeOptions();
-        $chromeOptions->setExperimentalOption('prefs', [
-            'intl.accept_languages' => $options->acceptLanguage,
-        ]);
-
-        return $chromeOptions;
-    }
-
-    private function reducedMotionPreference(): int
-    {
-        return filter_var($_SERVER['PANTHER_NO_REDUCED_MOTION'] ?? false, FILTER_VALIDATE_BOOLEAN) ? 0 : 1;
+        return $normalized;
     }
 }

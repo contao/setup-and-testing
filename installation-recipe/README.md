@@ -57,7 +57,7 @@ $pageId = $result->value('regular');
 $url = $result->interpolate('/pages/{regular}/{regular->alias}');
 ```
 
-The package is intentionally independent of `contao/core-bundle`, Panther, and PHPUnit so the same recipe model can later power an installation or theme importer.
+The package is intentionally independent of `contao/core-bundle`, browser tooling, and PHPUnit so the same recipe model can later power an installation or theme importer.
 
 ## Portable recipe archives
 

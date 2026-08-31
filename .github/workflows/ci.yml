@@ -114,32 +114,27 @@ jobs:
                   foreach ([
                       'symfony/browser-kit',
                       'symfony/console',
-                      'symfony/dependency-injection',
                       'symfony/dom-crawler',
                       'symfony/filesystem',
                       'symfony/http-client',
-                      'symfony/http-kernel',
                       'symfony/process',
                       'symfony/yaml',
                   ] as $package) {
                       $composer['require'][$package] = '^${{ matrix.symfony }}';
                   }
 
-                  $composer['require']['symfony/panther'] = '^2.1';
                   file_put_contents('composer.json', json_encode($composer, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR)."\n");
 
             - name: Install the selected PHPUnit and Symfony versions
               run: >-
                   composer update
+                  playwright-php/playwright
                   phpunit/phpunit
                   symfony/browser-kit
                   symfony/console
-                  symfony/dependency-injection
                   symfony/dom-crawler
                   symfony/filesystem
                   symfony/http-client
-                  symfony/http-kernel
-                  symfony/panther
                   symfony/process
                   symfony/yaml
                   --with-all-dependencies --no-interaction --no-progress

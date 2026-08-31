@@ -18,20 +18,20 @@ use PHPUnit\Framework\TestCase;
 
 class BrowserOptionsNormalizerTest extends TestCase
 {
-    public function testNormalizesAcceptedLanguagesForFirefox(): void
+    public function testNormalizesAcceptedLanguagesAndViewport(): void
     {
-        $options = BrowserOptions::create()->withAcceptLanguage('de-CH,de,en');
-        $normalized = (new BrowserOptionsNormalizer())->forFirefox($options, ['--headless'])->toArray();
+        $options = BrowserOptions::create()
+            ->withAcceptLanguage('de-CH,de,en')
+            ->withViewport(1440, 1200)
+        ;
+        $normalized = (new BrowserOptionsNormalizer())->normalize($options);
 
-        $this->assertSame('de-CH,de,en', $normalized['prefs']['intl.accept_languages']);
-        $this->assertSame(['--headless'], $normalized['args']);
+        $this->assertSame(['Accept-Language' => 'de-CH,de,en'], $normalized['extraHTTPHeaders']);
+        $this->assertSame(['width' => 1440, 'height' => 1200], $normalized['viewport']);
     }
 
-    public function testNormalizesAcceptedLanguagesForChrome(): void
+    public function testLeavesUnsetOptionsToPlaywrightDefaults(): void
     {
-        $options = BrowserOptions::create()->withAcceptLanguage('de-CH,de,en');
-        $normalized = (new BrowserOptionsNormalizer())->forChrome($options)->toArray();
-
-        $this->assertSame('de-CH,de,en', $normalized['prefs']['intl.accept_languages']);
+        $this->assertSame([], (new BrowserOptionsNormalizer())->normalize(BrowserOptions::create()));
     }
 }
