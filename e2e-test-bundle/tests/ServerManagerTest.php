@@ -12,12 +12,33 @@ declare(strict_types=1);
 
 namespace Contao\E2eTestBundle\Tests;
 
+use Contao\E2eTestBundle\Exception\E2eTestException;
 use Contao\E2eTestBundle\Http\ServerManager;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Filesystem\Filesystem;
+use Symfony\Component\Filesystem\Path;
 
 class ServerManagerTest extends TestCase
 {
+    public function testReportsAnIncompleteInstallation(): void
+    {
+        $filesystem = new Filesystem();
+        $directory = sys_get_temp_dir().'/contao-e2e-server-'.bin2hex(random_bytes(8));
+        $filesystem->mkdir($directory);
+
+        try {
+            (new ServerManager($filesystem))->start($directory, 'sqlite:///:memory:', $directory.'/runtime');
+            $this->fail('Starting the server without a front controller should fail.');
+        } catch (E2eTestException $exception) {
+            $this->assertSame(
+                'The Contao E2E installation is incomplete because "'.Path::join($directory, 'public/index.php').'" is missing. Clear the reusable installation cache with "vendor/bin/contao-e2e cache:clear" and run the tests again.',
+                $exception->getMessage(),
+            );
+        } finally {
+            $filesystem->remove($directory);
+        }
+    }
+
     public function testDisablesXdebug(): void
     {
         $filesystem = new Filesystem();

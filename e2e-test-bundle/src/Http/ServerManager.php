@@ -27,6 +27,8 @@ final readonly class ServerManager
 
     public function start(string $directory, string $databaseUrl, string $runtimeDirectory): ServerProcess
     {
+        $this->assertDocumentRootExists($directory);
+
         $port = $this->portFinder->find();
         $mappingFile = Path::join($runtimeDirectory, 'origins.json');
         $routerFile = Path::join($runtimeDirectory, 'router.php');
@@ -57,6 +59,15 @@ final readonly class ServerManager
         $this->waitUntilListening($process, $port);
 
         return new ServerProcess($process, $port, $mappingFile);
+    }
+
+    private function assertDocumentRootExists(string $directory): void
+    {
+        $frontController = Path::join($directory, 'public/index.php');
+
+        if (!is_file($frontController)) {
+            throw new E2eTestException(\sprintf('The Contao E2E installation is incomplete because "%s" is missing. Clear the reusable installation cache with "vendor/bin/contao-e2e cache:clear" and run the tests again.', $frontController));
+        }
     }
 
     private function waitUntilListening(Process $process, int $port): void
