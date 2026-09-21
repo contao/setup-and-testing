@@ -179,8 +179,11 @@ final readonly class BackendBrowser
         $frame = $this->page()->frameLocator($frameSelector);
         $frame->locator('#tl_listing')->waitFor(['state' => 'attached']);
         $this->expandFileTree($frame, \dirname($path));
-        $selector = \sprintf('input[type="radio"][value="%s"]', $this->escapeCssString($path));
-        $frame->locator($selector)->check();
+        $pathSelector = $this->escapeCssString($path);
+        $frame->locator(\sprintf('li[data-id="%s"] > .tl_left', $pathSelector))->click();
+        $frame->locator(\sprintf('input[type="radio"][value="%s"]', $pathSelector))->waitForFunction(
+            '(element) => element.checked',
+        );
         $this->page()->locator('.simple-modal .btn.primary')->click();
         $this->waitForFileSelection($field, $expectedValue);
     }
