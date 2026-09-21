@@ -82,9 +82,19 @@ final class DockerDatabaseConfigTest extends TestCase
             $cache->rootDirectory.'/database/'.DockerDatabaseConfig::mysql('mysql:8.0')->storageKey().'/data',
             DockerDatabaseConfig::mysql('mysql:8.0')->storageDirectory($cache),
         );
+    }
+
+    public function testStoresTheMarkerOutsideTheDatabaseOwnedDirectory(): void
+    {
+        $cache = CacheConfig::forProject(\dirname(__DIR__, 2));
+
         $this->assertSame(
-            $cache->rootDirectory.'/database/data/.contao-e2e-database',
+            $cache->rootDirectory.'/database/.contao-e2e-database',
             DockerDatabaseConfig::mariaDb()->storageMarker($cache),
+        );
+        $this->assertSame(
+            $cache->rootDirectory.'/database/'.DockerDatabaseConfig::mysql('mysql:8.0')->storageKey().'/.contao-e2e-database',
+            DockerDatabaseConfig::mysql('mysql:8.0')->storageMarker($cache),
         );
     }
 }

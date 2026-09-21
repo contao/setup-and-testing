@@ -63,15 +63,20 @@ final readonly class DockerDatabaseConfig
 
     public function storageDirectory(CacheConfig $cache): string
     {
-        if ($this->isDefault()) {
-            return Path::join($cache->rootDirectory, 'database/data');
-        }
-
-        return Path::join($cache->rootDirectory, 'database', $this->storageKey(), 'data');
+        return Path::join($this->storageRootDirectory($cache), 'data');
     }
 
     public function storageMarker(CacheConfig $cache): string
     {
-        return Path::join($this->storageDirectory($cache), '.contao-e2e-database');
+        return Path::join($this->storageRootDirectory($cache), '.contao-e2e-database');
+    }
+
+    private function storageRootDirectory(CacheConfig $cache): string
+    {
+        if ($this->isDefault()) {
+            return Path::join($cache->rootDirectory, 'database');
+        }
+
+        return Path::join($cache->rootDirectory, 'database', $this->storageKey());
     }
 }
