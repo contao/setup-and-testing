@@ -180,7 +180,7 @@ final readonly class BackendBrowser
         $frame->locator('#tl_listing')->waitFor(['state' => 'attached']);
         $this->expandFileTree($frame, \dirname($path));
         $selector = \sprintf('input[type="radio"][value="%s"]', $this->escapeCssString($path));
-        $frame->locator($selector)->click();
+        $frame->locator($selector)->check();
         $this->page()->locator('.simple-modal .btn.primary')->click();
         $this->waitForFileSelection($field, $expectedValue);
     }
@@ -248,6 +248,7 @@ final readonly class BackendBrowser
 
             if (!str_contains((string) $folder->getAttribute('class'), 'foldable--open')) {
                 $folder->click();
+                $folder->waitForFunction('(element) => element.classList.contains("foldable--open")');
             }
         }
     }
