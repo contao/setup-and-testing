@@ -103,6 +103,25 @@ $backend->waitForAjax(
 $backend->waitFor('#extension_widget');
 ```
 
+Playwright's native navigation handling follows the browser's document lifecycle. Many Contao backend links are
+intercepted by Turbo, which replaces the rendered page without creating a new document. The Playwright click therefore
+finishes once the element has been clicked, while the Turbo render may still be in progress. Native navigation waiting
+cannot reliably close that gap because a Turbo visit is not a browser navigation.
+
+`waitForNavigation()` registers a `turbo:render` listener before executing the action, avoiding a race with fast Turbo
+responses. It completes when that event fires or when a full document navigation replaces the current page. Backend
+helpers that trigger navigation use it automatically. Wrap extension-specific actions in it whenever they may result
+in either kind of navigation:
+
+```php
+$backend->waitForNavigation(
+    static fn () => $backend->page()->getByRole('link', ['name' => 'Extension settings'])->click(),
+);
+```
+
+Regular Playwright locator auto-waiting remains sufficient for actions that only update the current page without
+navigating. Use `waitForAjax()` instead when a Contao AJAX callback rebuilds part of a form.
+
 The wrapper also supports buttons and operation links whose title starts with a translated label. `selectFile($field, $path, $expectedValue)` opens Contao's real modal file picker, expands nested directories, applies the selection, and optionally waits until the hidden widget value matches a known UUID.
 
 Use the browser-independent options object when a real browser request must exercise locale negotiation. It maps the accepted languages to an `Accept-Language` header for every browser engine:

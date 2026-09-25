@@ -46,7 +46,7 @@ final readonly class BackendBrowser
     {
         $this->page()->locator('[name="username"]')->fill($username);
         $this->page()->locator('[name="password"]')->fill($password);
-        $this->navigate(fn () => $this->page()->locator('button[name="login"]')->click());
+        $this->waitForNavigation(fn () => $this->page()->locator('button[name="login"]')->click());
     }
 
     /**
@@ -54,39 +54,22 @@ final readonly class BackendBrowser
      */
     public function submitForm(string $button, array $values = []): void
     {
-        $this->waitForBackend();
-
         foreach ($values as $field => $value) {
             $this->fillField($field, $value);
         }
 
-        $button = $this->visible(
-            $this->page()->getByRole('button', ['name' => $button, 'exact' => true]),
-            \sprintf('submit button labeled "%s"', $button),
-        );
-        $this->navigate(static fn () => $button->click());
+        $this->waitForNavigation(fn () => $this->page()->getByRole('button', ['name' => $button, 'exact' => true])->click());
     }
 
     public function submitNew(): void
     {
-        $this->waitForBackend();
         $action = $this->visible($this->page()->locator('.header_new'), 'new record action');
-        $this->navigate(static fn () => $action->click());
+        $this->waitForNavigation(static fn () => $action->click());
     }
 
     public function submitAction(string $label): void
     {
-        $this->waitForBackend();
-
-        foreach ($this->page()->locator('button[type="submit"]')->all() as $button) {
-            if ($button->isVisible() && $this->buttonMatches($button, $label)) {
-                $this->navigate(static fn () => $button->click());
-
-                return;
-            }
-        }
-
-        throw new \LogicException(\sprintf('Could not find a visible submit action labeled "%s".', $label));
+        $this->waitForNavigation(fn () => $this->page()->getByRole('button', ['name' => $label])->click());
     }
 
     public function check(string $field): void
@@ -130,60 +113,70 @@ final readonly class BackendBrowser
         $this->page()->waitForFunction('(marker) => window[marker] === true', $marker);
     }
 
+    /**
+     * Executes an action and waits for either a Turbo render or a new document.
+     *
+     * Playwright does not recognize Turbo renders as browser navigations. The marker
+     * lets the synchronous PHP bridge register the event listener before the action.
+     *
+     * @param callable(): void $action
+     */
+    public function waitForNavigation(callable $action): void
+    {
+        $marker = '__contaoE2eNavigation'.bin2hex(random_bytes(8));
+        $this->page()->evaluate(
+            '(marker) => { window[marker] = false; document.addEventListener("turbo:render", () => window[marker] = true, { once: true }); }',
+            $marker,
+        );
+        $action();
+        $this->page()->waitForFunction('(marker) => window[marker] !== false', $marker);
+    }
+
     public function clickLink(string $label): void
     {
-        $link = $this->visible(
-            $this->page()->getByRole('link', ['name' => $label, 'exact' => true]),
-            \sprintf('link labeled "%s"', $label),
-        );
-        $this->navigate(static fn () => $link->click());
+        $selector = \sprintf('a.navigation:text-is("%s")', $this->escapeCssString($label));
+        $this->waitForNavigation(fn () => $this->page()->locator($selector)->click());
     }
 
     public function clickButton(string $selector): void
     {
-        $this->waitForBackend();
         $this->visible($this->page()->locator($selector), \sprintf('button matching "%s"', $selector))->click();
     }
 
     public function clickTitlePrefix(string $title): void
     {
-        $this->waitForBackend();
         $selector = \sprintf('a[title^="%s"]', $this->escapeCssString($title));
-        $link = $this->page()->locator($selector)->first();
-        $link->waitFor(['state' => 'attached']);
+        $link = $this->page()->locator($selector.':visible')->first();
 
-        $href = $link->getAttribute('href');
-
-        if (null === $href) {
-            throw new \LogicException(\sprintf('The link whose title starts with "%s" has no target.', $title));
+        if (0 === $link->count()) {
+            $menu = $this->page()->locator('.operations:visible:has('.$selector.')')->first();
+            $menu->locator('[data-contao--operations-menu-target="controller"]:visible')->click();
         }
 
-        $this->browser->visit($href);
+        $this->waitForNavigation(static fn () => $link->click());
     }
 
     public function fillRichText(string $field, string $text): void
     {
-        $this->waitForBackend();
         $this->page()->frameLocator('#ctrl_'.$field.'_ifr')->locator('#tinymce')->fill($text);
     }
 
     public function selectFile(string $field, string $path, string|null $expectedValue = null): void
     {
-        $this->waitForBackend();
         $triggerSelector = '#ft_'.$field;
         $trigger = $this->page()->locator($triggerSelector);
-        $trigger->waitForFunction('(element) => element.hasEvent?.("click") === true');
+        $this->page()->waitForFunction(
+            '(selector) => document.querySelector(selector)?.hasEvent?.("click") === true',
+            $triggerSelector,
+        );
 
         $frameSelector = 'iframe[name="simple-modal-iframe"]';
         $trigger->click();
         $frame = $this->page()->frameLocator($frameSelector);
         $frame->locator('#tl_listing')->waitFor(['state' => 'attached']);
         $this->expandFileTree($frame, \dirname($path));
-        $pathSelector = $this->escapeCssString($path);
-        $frame->locator(\sprintf('li[data-id="%s"] > .tl_left', $pathSelector))->click();
-        $frame->locator(\sprintf('input[type="radio"][value="%s"]', $pathSelector))->waitForFunction(
-            '(element) => element.checked',
-        );
+        $selector = \sprintf('input[type="radio"][value="%s"]', $this->escapeCssString($path));
+        $frame->locator($selector)->check();
         $this->page()->locator('.simple-modal .btn.primary')->click();
         $this->waitForFileSelection($field, $expectedValue);
     }
@@ -215,18 +208,6 @@ final readonly class BackendBrowser
         return $this->visible($this->page()->locator($selector), \sprintf('"%s" select', $field));
     }
 
-    private function buttonMatches(LocatorInterface $button, string $label): bool
-    {
-        $image = $button->locator('img[alt]');
-        $descriptions = [
-            trim($button->innerText()),
-            (string) $button->getAttribute('title'),
-            $image->count() ? (string) $image->first()->getAttribute('alt') : '',
-        ];
-
-        return str_contains(implode("\0", $descriptions), $label);
-    }
-
     private function visible(LocatorInterface $locator, string $description): LocatorInterface
     {
         $locator->first()->waitFor(['state' => 'attached']);
@@ -251,7 +232,6 @@ final readonly class BackendBrowser
 
             if (!str_contains((string) $folder->getAttribute('class'), 'foldable--open')) {
                 $folder->click();
-                $folder->waitForFunction('(element) => element.classList.contains("foldable--open")');
             }
         }
     }
@@ -264,36 +244,14 @@ final readonly class BackendBrowser
             return;
         }
 
-        $this->page()->locator('#ctrl_'.$field)->waitForFunction(
-            '(element, expected) => element.value.includes(expected)',
-            $expectedValue,
-        );
-    }
-
-    /**
-     * @param callable(): void $action
-     */
-    private function navigate(callable $action): void
-    {
-        $marker = bin2hex(random_bytes(8));
-        $this->page()->locator('body')->evaluate(
-            '(element, marker) => element.dataset.contaoE2eNavigation = marker',
-            $marker,
-        );
-        $action();
         $this->page()->waitForFunction(
-            '(marker) => document.body?.dataset.contaoE2eNavigation !== marker',
-            $marker,
+            '([selector, expected]) => document.querySelector(selector)?.value.includes(expected)',
+            ['#ctrl_'.$field, $expectedValue],
         );
     }
 
     private function escapeCssString(string $value): string
     {
         return addcslashes($value, "\\\"\n\r\f");
-    }
-
-    private function waitForBackend(): void
-    {
-        $this->page()->locator('body.js')->waitFor();
     }
 }
