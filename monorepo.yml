@@ -7,8 +7,8 @@ composer:
     conflict: []
 
 repositories:
-    e2e-test-bundle:
-        url: https://github.com/contao/e2e-test-bundle.git
+    e2e-testing:
+        url: https://github.com/contao/e2e-testing.git
 
     installation-recipe:
         url: https://github.com/contao/installation-recipe.git

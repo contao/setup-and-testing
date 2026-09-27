@@ -18,9 +18,9 @@ use Symplify\EasyCodingStandard\ValueObject\Option;
 return ECSConfig::configure()
     ->withSets([SetList::CONTAO])
     ->withPaths([
-        __DIR__.'/e2e-test-bundle/bin',
-        __DIR__.'/e2e-test-bundle/src',
-        __DIR__.'/e2e-test-bundle/tests',
+        __DIR__.'/e2e-testing/bin',
+        __DIR__.'/e2e-testing/src',
+        __DIR__.'/e2e-testing/tests',
         __DIR__.'/installation-recipe/src',
         __DIR__.'/installation-recipe/tests',
     ])

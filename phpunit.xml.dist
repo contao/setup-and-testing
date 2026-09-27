@@ -5,7 +5,7 @@
   <testsuites>
     <testsuite name="packages">
       <directory>installation-recipe/tests</directory>
-      <directory>e2e-test-bundle/tests</directory>
+      <directory>e2e-testing/tests</directory>
     </testsuite>
   </testsuites>
 </phpunit>

@@ -23,16 +23,16 @@ return RectorConfig::configure()
     ->withPhpSets(php82: true)
     ->withSets([SetList::CONTAO])
     ->withPaths([
-        __DIR__.'/e2e-test-bundle/bin',
-        __DIR__.'/e2e-test-bundle/src',
-        __DIR__.'/e2e-test-bundle/tests',
+        __DIR__.'/e2e-testing/bin',
+        __DIR__.'/e2e-testing/src',
+        __DIR__.'/e2e-testing/tests',
         __DIR__.'/installation-recipe/src',
         __DIR__.'/installation-recipe/tests',
     ])
     ->withSkip([
         AddOverrideAttributeToOverriddenMethodsRector::class,
         ClassPropertyAssignToConstructorPromotionRector::class => [
-            'e2e-test-bundle/src/InstallationLease.php',
+            'e2e-testing/src/InstallationLease.php',
         ],
         DeprecatedAnnotationToDeprecatedAttributeRector::class,
         ReadOnlyClassRector::class,

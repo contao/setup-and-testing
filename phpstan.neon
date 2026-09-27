@@ -10,7 +10,7 @@ parameters:
     paths:
         - installation-recipe/src
         - installation-recipe/tests
-        - e2e-test-bundle/src
-        - e2e-test-bundle/tests
+        - e2e-testing/src
+        - e2e-testing/tests
     treatPhpDocTypesAsCertain: false
     rememberPossiblyImpureFunctionValues: false

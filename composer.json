@@ -22,7 +22,7 @@
     "prefer-stable": true,
     "autoload-dev": {
         "psr-4": {
-            "Contao\\E2eTestBundle\\Tests\\": "e2e-test-bundle/tests/",
+            "Contao\\E2eTesting\\Tests\\": "e2e-testing/tests/",
             "Contao\\InstallationRecipe\\Tests\\": "installation-recipe/tests/"
         }
     },
@@ -53,15 +53,15 @@
         "test": "@php vendor/bin/phpunit --configuration=phpunit.xml.dist"
     },
     "replace": {
-        "contao/e2e-test-bundle": "self.version",
+        "contao/e2e-testing": "self.version",
         "contao/installation-recipe": "self.version"
     },
     "bin": [
-        "e2e-test-bundle/bin/contao-e2e"
+        "e2e-testing/bin/contao-e2e"
     ],
     "autoload": {
         "psr-4": {
-            "Contao\\E2eTestBundle\\": "e2e-test-bundle/src/",
+            "Contao\\E2eTesting\\": "e2e-testing/src/",
             "Contao\\InstallationRecipe\\": "installation-recipe/src/"
         }
     }

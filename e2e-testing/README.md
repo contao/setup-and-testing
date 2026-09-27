@@ -1,0 +1,203 @@
+# Contao E2E testing
+
+`contao/e2e-testing` is a regular Composer library that prepares a real Contao Managed Edition, migrates an isolated MySQL/MariaDB database, loads installation recipes, and exposes raw HTTP, BrowserKit, and Playwright clients. It deliberately does not require any Contao bundle, so the test suite selects the Contao version in its recipe.
+
+If Docker is available, no database setup is needed. The first test starts a reusable `mariadb:11.4` container on a random loopback port. The last E2E process stops it, and subsequent runs restart the same container. Its `/var/lib/mysql` directory is bind-mounted to `.contao-e2e/database/data`, so all generated database files remain inside the project-local E2E workspace. Parallel test workers keep shared leases and only the final worker stops the database. If a process is killed before PHP can run its shutdown handlers, `database:stop` cleans up any remaining containers.
+
+Select a database explicitly in the PHPUnit configuration when an extension supports a particular database range:
+
+```php
+use Contao\E2eTesting\Database\DockerDatabaseConfig;
+
+$mariaDb = $config->withDatabase(DockerDatabaseConfig::mariaDb('mariadb:10.11'));
+$mysql = $config->withDatabase(DockerDatabaseConfig::mysql('mysql:8.0'));
+```
+
+Different types and image versions use independent reusable containers and storage directories. This makes those configurations suitable for a PHPUnit data provider or separate CI jobs. A CI matrix can configure the same tests without changing PHP code:
+
+```shell
+CONTAO_E2E_DATABASE_TYPE=mysql CONTAO_E2E_DATABASE_IMAGE=mysql:8.0 composer e2e-tests
+CONTAO_E2E_DATABASE_TYPE=mariadb CONTAO_E2E_DATABASE_IMAGE=mariadb:10.11 composer e2e-tests
+```
+
+An administrative database URL that may create test databases overrides Docker:
+
+```shell
+export CONTAO_E2E_DATABASE_URL='mysql://root:password@127.0.0.1:3306'
+```
+
+The PowerShell equivalent on Windows is:
+
+```powershell
+$env:CONTAO_E2E_DATABASE_URL = 'mysql://root:password@127.0.0.1:3306'
+```
+
+Windows is supported with native PHP, Composer, and Node.js 20 or newer. The automatic database requires Docker Desktop configured for Linux containers. Alternatively, configure an existing MySQL or MariaDB server with `CONTAO_E2E_DATABASE_URL`. Composer creates Windows command proxies for `contao-e2e`, PHPUnit, Playwright, and ParaTest, while the library invokes PHP, Composer, Git, and Docker without relying on a POSIX shell.
+
+Install the Playwright browser binaries once after requiring the package:
+
+```shell
+vendor/bin/playwright-install --browsers
+```
+
+Use `vendor/bin/playwright-install --with-deps` on a fresh Linux CI runner to install the required system libraries as well. Playwright caches matching Chromium, Firefox, and WebKit binaries outside the project and reuses them between runs.
+
+Use the trait with PHPUnit 10 through 13; no test base class is imposed:
+
+```php
+use Contao\E2eTesting\Browser\BrowserOptions;
+use Contao\E2eTesting\ManagedEdition\ManagedEditionConfig;
+use Contao\E2eTesting\ManagedEdition\ManagedEditionTestTrait;
+use Contao\InstallationRecipe\Composer\ComposerConfig;
+use Contao\InstallationRecipe\Recipe\InstallationRecipe;
+use PHPUnit\Framework\TestCase;
+
+final class LoginTest extends TestCase
+{
+    use ManagedEditionTestTrait;
+
+    protected static function createManagedEditionConfig(): ManagedEditionConfig
+    {
+        $composer = ComposerConfig::managedEdition('^5.7')
+            ->withPathPackage('acme/example-bundle', dirname(__DIR__), '1.0.x-dev');
+
+        return ManagedEditionConfig::create(
+            InstallationRecipe::create($composer)->withFixtureFile(__DIR__.'/fixtures.yaml'),
+            dirname(__DIR__),
+        );
+    }
+
+    public function testLoginPage(): void
+    {
+        $backend = self::managedEdition()->createBackendBrowser();
+        $backend->visit('/contao/login');
+        $backend->submitLogin('admin', 'password');
+
+        $this->assertSelectorTextContains('body', 'Contao');
+    }
+}
+```
+
+`BackendBrowser` wraps recurring Contao backend interactions without imposing another PHPUnit trait or base class. Firefox is the default, while Chromium and WebKit are selected with `BrowserType`. The underlying Playwright page, context, and browser session remain accessible for arbitrary operations and assertions.
+
+```php
+$backend = self::managedEdition()->createBackendBrowser();
+$backend->visit('/contao/login');
+$backend->submitLogin('admin', 'password');
+$backend->clickLink('Articles');
+$backend->submitNew();
+$backend->submitAction('Paste at the top');
+$backend->selectAndWaitForAjax('type', 'text');
+$backend->waitFor('textarea[name="text"]');
+$backend->fillRichText('text', 'Content created by an E2E test.');
+$backend->check('published');
+$backend->submitForm('Save and close', ['headline[value]' => 'Headline']);
+```
+
+Dynamic Contao palettes finish asynchronously. Use `checkAndWaitForAjax()` or `selectAndWaitForAjax()` when changing a field causes Contao to rebuild part of the form. For extension-specific controls, `waitForAjax()` accepts the Playwright action that triggers the update:
+
+```php
+$backend->waitForAjax(
+    static fn () => $backend->page()->locator('[data-action="load-widget"]')->click(),
+);
+$backend->waitFor('#extension_widget');
+```
+
+Playwright's native navigation handling follows the browser's document lifecycle. Many Contao backend links are
+intercepted by Turbo, which replaces the rendered page without creating a new document. The Playwright click therefore
+finishes once the element has been clicked, while the Turbo render may still be in progress. Native navigation waiting
+cannot reliably close that gap because a Turbo visit is not a browser navigation.
+
+`waitForNavigation()` registers a `turbo:render` listener before executing the action, avoiding a race with fast Turbo
+responses. It completes when that event fires or when a full document navigation replaces the current page. Backend
+helpers that trigger navigation use it automatically. Wrap extension-specific actions in it whenever they may result
+in either kind of navigation:
+
+```php
+$backend->waitForNavigation(
+    static fn () => $backend->page()->getByRole('link', ['name' => 'Extension settings'])->click(),
+);
+```
+
+Regular Playwright locator auto-waiting remains sufficient for actions that only update the current page without
+navigating. Use `waitForAjax()` instead when a Contao AJAX callback rebuilds part of a form.
+
+The wrapper also supports buttons and operation links whose title starts with a translated label. `selectFile($field, $path, $expectedValue)` opens Contao's real modal file picker, expands nested directories, applies the selection, and optionally waits until the hidden widget value matches a known UUID.
+
+Use the browser-independent options object when a real browser request must exercise locale negotiation. It maps the accepted languages to an `Accept-Language` header for every browser engine:
+
+```php
+$options = BrowserOptions::create()->withAcceptLanguage('de-CH,de,en');
+$backend = self::managedEdition()->createBackendBrowser(options: $options);
+// The header works with Chromium, Firefox, and WebKit.
+```
+
+The Playwright process and launched browser engine are reused for the test class. Every call to `createBrowser()` or `createBackendBrowser()` creates a cheap, isolated browser context with independent cookies and storage, so tests can represent multiple simultaneous users. Active contexts are closed before the database is reset, while the browser process remains available for the next test.
+
+Recipe file mappings copy files into the Managed Edition. Call `ManagedEdition::synchronizeFiles('files/path/example.jpg')` when a test also needs those files registered in Contao's DBAFS, for example before selecting them in a backend file-tree widget. With no path, the complete configured filesystem is synchronized.
+
+Without an origin, Playwright uses the local E2E server URI directly so that absolute redirects and cookies stay on the same browser origin. Pass `Origin::http('example.test')` or `Origin::https('example.test')` when a test must emulate a page DNS entry or HTTPS. The server maps that origin without requiring a real domain or certificate.
+
+Each consumer project gets one ignored `.contao-e2e/` workspace. Dependency, application, and fixture fingerprints are separate: unchanged Composer input reuses `vendor/`; source or configuration changes rerun setup and migrations; fixture-only changes only reset and reload the database. Parallel processes acquire separate installation and database slots.
+
+Path-package source fingerprints are cached for the lifetime of the PHPUnit process. Test code should not modify package source files while the suite is running; call `ProcessCachedSourceFingerprint::reset()` if a specialized test intentionally does so.
+
+Read-only tests with a data provider can avoid repeatedly loading an unchanged fixture set. `prepareDatabase($fixtures)` fingerprints the fixture contents and only resets the database when they change; repeated calls still clear active browser sessions and mutable runtime caches. Use `resetDatabase()` instead whenever a test may have modified database state.
+
+Consumer projects can optionally run independent test-case classes in parallel with ParaTest. ParaTest is deliberately not a dependency of this package because its releases are closely coupled to PHPUnit versions. Install the version Composer selects for the project's PHPUnit version:
+
+```shell
+composer require --dev brianium/paratest
+```
+
+The installation and database pools isolate worker processes, and every worker gets its own Playwright process. Keep data-provider cases in the same process by using ParaTest's default class-level runner rather than `--functional`:
+
+```shell
+XDEBUG_MODE=off vendor/bin/paratest \
+    --testsuite=e2e \
+    --processes=2 \
+    --cache-directory=.contao-e2e/cache/phpunit \
+    --tmp-dir=.contao-e2e/cache/paratest
+```
+
+Use the equivalent PowerShell command on Windows:
+
+```powershell
+$env:XDEBUG_MODE = 'off'; vendor\bin\paratest --testsuite=e2e --processes=2 --cache-directory=.contao-e2e/cache/phpunit --tmp-dir=.contao-e2e/cache/paratest
+```
+
+Create `.contao-e2e/cache/paratest` before starting ParaTest, for example by running `vendor/bin/contao-e2e doctor --quiet`. Projects using Composer bin plugins may isolate ParaTest in a dedicated vendor-bin directory instead.
+
+Xdebug is disabled for Composer, setup, migration, and other managed subprocesses as well as for the E2E web server. Playwright locators automatically wait for actionable elements and work with Contao's Turbo navigation without manual sleeps.
+
+`ManagedEdition::resetDatabase()` returns a `FixtureResult`. Call `$result->value('page_home')` to obtain the generated primary key of a named fixture, or pass a second column name to read another resolved value. `$result->interpolate('/pages/{page_home}')` substitutes generated values in paths or other strings.
+
+For monorepos, `MonorepoProject` discovers an explicit root package version or the `dev-main` branch alias and falls back
+to `dev-main` when neither exists. It also reads the package names from local `composer.json` files:
+
+```php
+use Contao\E2eTesting\Composer\MonorepoProject;
+
+$monorepo = MonorepoProject::discover(dirname(__DIR__));
+$composer = $monorepo->configureComposer(
+    ComposerConfig::managedEdition('^5.7'),
+    'packages/example-bundle',
+);
+```
+
+For HTTP tests without JavaScript, use Symfony's BrowserKit client. It returns a DomCrawler instance and supports links,
+forms, cookies, history, and access to the last response:
+
+```php
+$browser = self::managedEdition()->createHttpBrowser(Origin::https('example.test'));
+$crawler = $browser->request('GET', '/');
+
+$this->assertSame(200, $browser->getInternalResponse()->getStatusCode());
+$this->assertSame('Example', trim($crawler->filterXPath('//head/title')->text()));
+```
+
+Full Managed Editions are stored below `.contao-e2e/cache/installations/<fingerprint>/<slot>/project`. The matching
+MySQL or MariaDB database runs in the configured server or a reusable Docker container. The default database files are stored below `.contao-e2e/database/data`; additional image variants use `.contao-e2e/database/<fingerprint>/data`. The `runtime/` directory only contains
+the lightweight webserver router and origin mapping.
+
+`CONTAO_E2E_DIRECTORY` overrides the workspace, and `CONTAO_E2E_NO_CACHE=1` forces a fresh dependency installation. The `contao-e2e` executable is a Symfony Console application; run `vendor/bin/contao-e2e list` for all commands. `cache:clear` safely clears reusable installations, while `database:stop` stops every database variant belonging to the current project. It refuses to interrupt active tests unless `--force` is passed.
