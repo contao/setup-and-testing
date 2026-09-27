@@ -14,6 +14,7 @@ namespace Contao\E2eTestBundle\Database;
 
 use Contao\E2eTestBundle\Cache\CacheConfig;
 use Contao\E2eTestBundle\Exception\DockerUnavailableException;
+use Contao\E2eTestBundle\Exception\E2eTestException;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\Filesystem\Path;
 
@@ -23,11 +24,19 @@ final readonly class DockerDatabaseServer
         private DockerClient $docker = new DockerClient(),
         private DatabaseReadinessProbe $readinessProbe = new DatabaseReadinessProbe(),
         private Filesystem $filesystem = new Filesystem(),
+        private DockerDatabaseLeaseRegistry $leaseRegistry = new DockerDatabaseLeaseRegistry(),
     ) {
     }
 
     public function provide(CacheConfig $cache, DockerDatabaseConfig $database): DatabaseServerConfig
     {
+        $container = $this->containerName($cache, $database);
+        $leasePath = $this->leasePath($cache, $container);
+        $this->leaseRegistry->acquire(
+            $leasePath,
+            fn () => DockerDatabaseLease::acquire($leasePath, fn () => $this->docker->stop($container)),
+        );
+
         $lock = fopen(Path::join($cache->rootDirectory, 'locks/database-server.lock'), 'c+');
 
         if (false === $lock) {
@@ -48,10 +57,19 @@ final readonly class DockerDatabaseServer
         return $config;
     }
 
-    public function stop(CacheConfig $cache): void
+    public function stop(CacheConfig $cache, bool $force = false): void
     {
-        foreach ($this->docker->find($this->containerPrefix($cache)) as $container) {
-            $this->docker->stop($container);
+        $containers = $this->docker->find($this->containerPrefix($cache));
+        $locks = $force ? [] : $this->acquireStopLocks($cache, $containers);
+
+        try {
+            foreach ($containers as $container) {
+                $this->docker->stop($container);
+            }
+        } finally {
+            foreach ($locks as $lock) {
+                $lock->release();
+            }
         }
     }
 
@@ -89,6 +107,33 @@ final readonly class DockerDatabaseServer
     private function containerPrefix(CacheConfig $cache): string
     {
         return 'contao-e2e-'.substr(hash('sha256', $cache->projectDirectory), 0, 12);
+    }
+
+    private function leasePath(CacheConfig $cache, string $container): string
+    {
+        return Path::join($cache->rootDirectory, 'locks', $container.'.lock');
+    }
+
+    /**
+     * @param list<string> $containers
+     *
+     * @return list<DockerDatabaseExclusiveLock>
+     */
+    private function acquireStopLocks(CacheConfig $cache, array $containers): array
+    {
+        $locks = [];
+
+        foreach ($containers as $container) {
+            $lock = DockerDatabaseExclusiveLock::acquire($this->leasePath($cache, $container));
+
+            if (!$lock) {
+                throw new E2eTestException('A Docker database is still in use. Wait for the E2E tests to finish or use --force.');
+            }
+
+            $locks[] = $lock;
+        }
+
+        return $locks;
     }
 
     private function isStorageInitialized(CacheConfig $cache, DockerDatabaseConfig $database): bool

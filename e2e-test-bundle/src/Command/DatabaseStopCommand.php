@@ -15,15 +15,21 @@ namespace Contao\E2eTestBundle\Command;
 use Contao\E2eTestBundle\Database\DockerDatabaseServer;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Input\InputInterface;
+use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Style\SymfonyStyle;
 
 #[AsCommand('database:stop', 'Stop all Docker database variants for this project')]
 final class DatabaseStopCommand extends AbstractWorkspaceCommand
 {
+    protected function configure(): void
+    {
+        $this->addOption('force', 'f', InputOption::VALUE_NONE, 'Stop databases that are still used by E2E tests');
+    }
+
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
-        (new DockerDatabaseServer())->stop($this->cache());
+        (new DockerDatabaseServer())->stop($this->cache(), (bool) $input->getOption('force'));
         (new SymfonyStyle($input, $output))->success('E2E Docker databases stopped.');
 
         return self::SUCCESS;

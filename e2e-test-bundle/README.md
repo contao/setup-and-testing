@@ -2,7 +2,7 @@
 
 `contao/e2e-test-bundle` prepares a real Contao Managed Edition, migrates an isolated MySQL/MariaDB database, loads installation recipes, and exposes raw HTTP, BrowserKit, and Playwright clients. It does not require a Contao bundle itself, so the test suite selects the Contao version in its recipe.
 
-If Docker is available, no database setup is needed. The first test starts a reusable `mariadb:11.4` container on a random loopback port; subsequent runs reuse it. Its `/var/lib/mysql` directory is bind-mounted to `.contao-e2e/database/data`, so all generated database files remain inside the project-local E2E workspace.
+If Docker is available, no database setup is needed. The first test starts a reusable `mariadb:11.4` container on a random loopback port. The last E2E process stops it, and subsequent runs restart the same container. Its `/var/lib/mysql` directory is bind-mounted to `.contao-e2e/database/data`, so all generated database files remain inside the project-local E2E workspace. Parallel test workers keep shared leases and only the final worker stops the database. If a process is killed before PHP can run its shutdown handlers, `database:stop` cleans up any remaining containers.
 
 Select a database explicitly in the PHPUnit configuration when an extension supports a particular database range:
 
@@ -200,4 +200,4 @@ Full Managed Editions are stored below `.contao-e2e/cache/installations/<fingerp
 MySQL or MariaDB database runs in the configured server or a reusable Docker container. The default database files are stored below `.contao-e2e/database/data`; additional image variants use `.contao-e2e/database/<fingerprint>/data`. The `runtime/` directory only contains
 the lightweight webserver router and origin mapping.
 
-`CONTAO_E2E_DIRECTORY` overrides the workspace, and `CONTAO_E2E_NO_CACHE=1` forces a fresh dependency installation. The `contao-e2e` executable is a Symfony Console application; run `vendor/bin/contao-e2e list` for all commands. `cache:clear` safely clears reusable installations, while `database:stop` stops every database variant belonging to the current project.
+`CONTAO_E2E_DIRECTORY` overrides the workspace, and `CONTAO_E2E_NO_CACHE=1` forces a fresh dependency installation. The `contao-e2e` executable is a Symfony Console application; run `vendor/bin/contao-e2e list` for all commands. `cache:clear` safely clears reusable installations, while `database:stop` stops every database variant belonging to the current project. It refuses to interrupt active tests unless `--force` is passed.
