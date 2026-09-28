@@ -22,6 +22,7 @@ final readonly class ServerManager
     public function __construct(
         private Filesystem $filesystem = new Filesystem(),
         private FreePortFinder $portFinder = new FreePortFinder(),
+        private string $appEnvironment = 'prod',
     ) {
     }
 
@@ -47,7 +48,7 @@ final readonly class ServerManager
             ],
             $directory,
             [
-                'APP_ENV' => 'prod',
+                'APP_ENV' => $this->appEnvironment,
                 'DATABASE_URL' => $databaseUrl,
                 'DISABLE_HTTP_CACHE' => '1',
                 'XDEBUG_MODE' => 'off',

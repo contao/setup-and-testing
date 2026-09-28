@@ -50,6 +50,22 @@ final class FingerprintCalculatorTest extends TestCase
         $this->assertNotSame($dcaChanged->application, $sourceChanged->application);
     }
 
+    public function testAppEnvironmentInvalidatesThePreparedApplication(): void
+    {
+        $directory = $this->createInputDirectory();
+        $calculator = new FingerprintCalculator(new SourceFingerprint());
+
+        try {
+            $prod = $calculator->calculate($this->config($directory));
+            $dev = $calculator->calculate($this->config($directory)->withAppEnvironment('dev'));
+
+            $this->assertSame($prod->dependency, $dev->dependency);
+            $this->assertNotSame($prod->application, $dev->application);
+        } finally {
+            (new Filesystem())->remove($directory);
+        }
+    }
+
     private function createInputDirectory(): string
     {
         $directory = \dirname(__DIR__, 2).'/.contao-e2e/runtime/unit-tests/fingerprint-'.bin2hex(random_bytes(6));

@@ -42,6 +42,15 @@ $env:CONTAO_E2E_DATABASE_URL = 'mysql://root:password@127.0.0.1:3306'
 
 Windows is supported with native PHP, Composer, and Node.js 20 or newer. The automatic database requires Docker Desktop configured for Linux containers. Alternatively, configure an existing MySQL or MariaDB server with `CONTAO_E2E_DATABASE_URL`. Composer creates Windows command proxies for `contao-e2e`, PHPUnit, and Playwright, while the library invokes PHP, Composer, Git, and Docker without relying on a POSIX shell.
 
+The managed edition runs in `prod` by default. Set the environment on the test configuration when a test needs Contao's development behavior:
+
+```php
+$devConfig = $config->withAppEnvironment('dev');
+$prodConfig = $config->withAppEnvironment('prod');
+```
+
+Changing the environment refreshes the cached application setup. The selected environment applies to Contao setup commands, database migration, and HTTP requests. With `ManagedEditionTestTrait`, return the desired configuration from `createManagedEditionConfig()` for each test class.
+
 ## Browser tests
 
 Install the Playwright browser binaries once after requiring the package:

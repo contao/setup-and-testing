@@ -54,6 +54,27 @@ class ServerManagerTest extends TestCase
         }
     }
 
+    public function testServerUsesTheSelectedAppEnvironment(): void
+    {
+        $filesystem = new Filesystem();
+        $directory = sys_get_temp_dir().'/contao-e2e-server-'.bin2hex(random_bytes(8));
+        $filesystem->dumpFile($directory.'/public/index.php', '<?php echo getenv("APP_ENV");');
+
+        try {
+            foreach (['dev', 'prod'] as $environment) {
+                $server = (new ServerManager($filesystem, appEnvironment: $environment))->start($directory, 'sqlite:///:memory:', $directory.'/runtime');
+
+                try {
+                    $this->assertSame($environment, file_get_contents('http://127.0.0.1:'.$server->port.'/'));
+                } finally {
+                    $server->stop();
+                }
+            }
+        } finally {
+            $filesystem->remove($directory);
+        }
+    }
+
     public function testServerOutputCannotBlockRequests(): void
     {
         $filesystem = new Filesystem();

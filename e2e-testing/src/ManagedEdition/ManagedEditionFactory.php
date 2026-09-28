@@ -15,6 +15,7 @@ namespace Contao\E2eTesting\ManagedEdition;
 use Contao\E2eTesting\Cache\FingerprintCalculator;
 use Contao\E2eTesting\Composer\ComposerInstaller;
 use Contao\E2eTesting\Database\DatabaseManager;
+use Contao\E2eTesting\Http\ServerManager;
 use Contao\E2eTesting\Installation\ApplicationPreparer;
 use Contao\E2eTesting\Installation\InstallationBuilder;
 use Contao\E2eTesting\Installation\InstallationPool;
@@ -47,7 +48,7 @@ final readonly class ManagedEditionFactory
         $database = new DatabaseManager($databaseServer, $databaseName);
         $installation = new PreparedInstallation($lease, $database, $fingerprints);
         $processRunner = new ProcessRunner();
-        $console = new ContaoConsole($processRunner);
+        $console = new ContaoConsole($processRunner, $config->appEnvironment);
         $builder = new InstallationBuilder(
             new ComposerInstaller($processRunner),
             new ApplicationPreparer(),
@@ -63,6 +64,9 @@ final readonly class ManagedEditionFactory
             throw $exception;
         }
 
-        return new ManagedEdition(new ManagedEditionState($installation, $config, $console));
+        return new ManagedEdition(
+            new ManagedEditionState($installation, $config, $console),
+            new ServerManager(appEnvironment: $config->appEnvironment),
+        );
     }
 }

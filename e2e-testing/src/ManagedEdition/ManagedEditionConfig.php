@@ -25,6 +25,7 @@ final readonly class ManagedEditionConfig
         public InstallationRecipe $recipe,
         public ManagedEditionEnvironment $environment,
         public DatabaseResetMode $resetMode = DatabaseResetMode::TRUNCATE,
+        public string $appEnvironment = 'prod',
     ) {
     }
 
@@ -38,7 +39,7 @@ final readonly class ManagedEditionConfig
 
     public function withEnvironment(ManagedEditionEnvironment $environment): self
     {
-        return new self($this->recipe, $environment, $this->resetMode);
+        return new self($this->recipe, $environment, $this->resetMode, $this->appEnvironment);
     }
 
     public function withDatabase(DatabaseServerConfig|DockerDatabaseConfig $database): self
@@ -54,11 +55,16 @@ final readonly class ManagedEditionConfig
 
         $mapping = new FileMapping($path, 'contao/dca/'.basename($path));
 
-        return new self($this->recipe->withFileMapping($mapping), $this->environment, $this->resetMode);
+        return new self($this->recipe->withFileMapping($mapping), $this->environment, $this->resetMode, $this->appEnvironment);
     }
 
     public function withResetMode(DatabaseResetMode $resetMode): self
     {
-        return new self($this->recipe, $this->environment, $resetMode);
+        return new self($this->recipe, $this->environment, $resetMode, $this->appEnvironment);
+    }
+
+    public function withAppEnvironment(string $appEnvironment): self
+    {
+        return new self($this->recipe, $this->environment, $this->resetMode, $appEnvironment);
     }
 }

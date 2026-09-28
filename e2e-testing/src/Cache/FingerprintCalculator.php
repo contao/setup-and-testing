@@ -42,6 +42,7 @@ final readonly class FingerprintCalculator
 
         $application = $this->hash([
             $dependency,
+            $config->appEnvironment,
             $sources,
             $this->hashFiles(array_map(static fn ($fragment) => $fragment->path, $recipe->assets->configFragments)),
             $this->hashMappings($recipe->assets->fileMappings),

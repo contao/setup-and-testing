@@ -45,6 +45,17 @@ final class ManagedEditionConfigTest extends TestCase
         $this->assertSame($database, $config->environment->database);
     }
 
+    public function testSelectsTheAppEnvironmentWithoutChangingTheOriginalConfig(): void
+    {
+        $recipe = InstallationRecipe::create(ComposerConfig::managedEdition('^5.7'));
+        $prod = ManagedEditionConfig::create($recipe, \dirname(__DIR__, 2));
+        $dev = $prod->withAppEnvironment('dev');
+
+        $this->assertSame('prod', $prod->appEnvironment);
+        $this->assertSame('dev', $dev->appEnvironment);
+        $this->assertSame('dev', $dev->withDatabase(DockerDatabaseConfig::mysql('mysql:8.0'))->appEnvironment);
+    }
+
     public function testAddsAProjectDcaFileToTheRecipe(): void
     {
         $directory = sys_get_temp_dir().'/contao-e2e-dca-'.bin2hex(random_bytes(6));
