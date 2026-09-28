@@ -18,6 +18,9 @@
         "symfony/process": "^6.4 || ^7.0 || ^8.0",
         "symfony/yaml": "^6.4 || ^7.0 || ^8.0"
     },
+    "require-dev": {
+        "bamarni/composer-bin-plugin": "^1.4"
+    },
     "minimum-stability": "dev",
     "prefer-stable": true,
     "autoload-dev": {
@@ -28,6 +31,9 @@
     },
     "config": {
         "allow-plugins": {
+            "bamarni/composer-bin-plugin": true,
+            "contao-components/installer": true,
+            "contao/manager-plugin": true,
             "php-http/discovery": false
         },
         "sort-packages": true
@@ -35,6 +41,10 @@
     "extra": {
         "branch-alias": {
             "dev-main": "1.0.x-dev"
+        },
+        "bamarni-bin": {
+            "bin-links": false,
+            "forward-command": false
         },
         "contao-manager-plugin": []
     },
