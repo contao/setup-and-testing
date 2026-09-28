@@ -39,10 +39,15 @@ final class FingerprintCalculatorTest extends TestCase
         $this->assertSame($initial->dependency, $configChanged->dependency);
         $this->assertNotSame($initial->application, $configChanged->application);
 
+        (new Filesystem())->dumpFile($directory.'/tl_content.php', '<?php $GLOBALS["TL_DCA"]["tl_content"]["fields"]["example"]["eval"]["mandatory"] = true;');
+        $dcaChanged = $calculator->calculate($this->config($directory));
+        $this->assertSame($configChanged->dependency, $dcaChanged->dependency);
+        $this->assertNotSame($configChanged->application, $dcaChanged->application);
+
         (new Filesystem())->dumpFile($directory.'/source/Example.php', '<?php return 2;');
         $sourceChanged = $calculator->calculate($this->config($directory));
-        $this->assertSame($configChanged->dependency, $sourceChanged->dependency);
-        $this->assertNotSame($configChanged->application, $sourceChanged->application);
+        $this->assertSame($dcaChanged->dependency, $sourceChanged->dependency);
+        $this->assertNotSame($dcaChanged->application, $sourceChanged->application);
     }
 
     private function createInputDirectory(): string
@@ -53,6 +58,7 @@ final class FingerprintCalculatorTest extends TestCase
         $filesystem->dumpFile($directory.'/source/Example.php', '<?php return 1;');
         $filesystem->dumpFile($directory.'/config.yaml', "contao:\n  csrf_cookie_prefix: initial\n");
         $filesystem->dumpFile($directory.'/fixture.yaml', "example:\n  - id: 1\n");
+        $filesystem->dumpFile($directory.'/tl_content.php', '<?php $GLOBALS["TL_DCA"]["tl_content"]["fields"]["example"]["eval"]["mandatory"] = false;');
 
         return $directory;
     }
@@ -68,7 +74,7 @@ final class FingerprintCalculatorTest extends TestCase
             ->withFixtureFile($directory.'/fixture.yaml')
         ;
         putenv('CONTAO_E2E_DATABASE_URL=mysql://root@127.0.0.1');
-        $config = ManagedEditionConfig::create($recipe, $directory);
+        $config = ManagedEditionConfig::create($recipe, $directory)->withDcaFile($directory.'/tl_content.php');
         putenv('CONTAO_E2E_DATABASE_URL');
 
         return $config;

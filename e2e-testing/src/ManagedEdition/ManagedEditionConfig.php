@@ -16,6 +16,7 @@ use Contao\E2eTesting\Cache\CacheConfig;
 use Contao\E2eTesting\Database\DatabaseResetMode;
 use Contao\E2eTesting\Database\DatabaseServerConfig;
 use Contao\E2eTesting\Database\DockerDatabaseConfig;
+use Contao\InstallationRecipe\File\FileMapping;
 use Contao\InstallationRecipe\Recipe\InstallationRecipe;
 
 final readonly class ManagedEditionConfig
@@ -43,6 +44,17 @@ final readonly class ManagedEditionConfig
     public function withDatabase(DatabaseServerConfig|DockerDatabaseConfig $database): self
     {
         return $this->withEnvironment($this->environment->withDatabase($database));
+    }
+
+    public function withDcaFile(string $path): self
+    {
+        if (!is_file($path) || !str_ends_with($path, '.php')) {
+            throw new \InvalidArgumentException(\sprintf('The DCA file "%s" must be an existing PHP file.', $path));
+        }
+
+        $mapping = new FileMapping($path, 'contao/dca/'.basename($path));
+
+        return new self($this->recipe->withFileMapping($mapping), $this->environment, $this->resetMode);
     }
 
     public function withResetMode(DatabaseResetMode $resetMode): self

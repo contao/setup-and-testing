@@ -13,10 +13,12 @@ declare(strict_types=1);
 namespace Contao\E2eTesting\Tests;
 
 use Contao\E2eTesting\Database\DockerDatabaseConfig;
+use Contao\E2eTesting\Installation\ApplicationPreparer;
 use Contao\E2eTesting\ManagedEdition\ManagedEditionConfig;
 use Contao\InstallationRecipe\Composer\ComposerConfig;
 use Contao\InstallationRecipe\Recipe\InstallationRecipe;
 use PHPUnit\Framework\TestCase;
+use Symfony\Component\Filesystem\Filesystem;
 
 final class ManagedEditionConfigTest extends TestCase
 {
@@ -41,5 +43,30 @@ final class ManagedEditionConfigTest extends TestCase
         $config = ManagedEditionConfig::create($recipe, \dirname(__DIR__, 2))->withDatabase($database);
 
         $this->assertSame($database, $config->environment->database);
+    }
+
+    public function testAddsAProjectDcaFileToTheRecipe(): void
+    {
+        $directory = sys_get_temp_dir().'/contao-e2e-dca-'.bin2hex(random_bytes(6));
+        $filesystem = new Filesystem();
+        $filesystem->mkdir($directory);
+
+        $path = $directory.'/tl_content.php';
+        $filesystem->dumpFile($path, '<?php $GLOBALS["TL_DCA"]["tl_content"]["fields"]["example"]["eval"]["mandatory"] = true;');
+
+        try {
+            $recipe = InstallationRecipe::create(ComposerConfig::managedEdition('^5.7'));
+            $config = ManagedEditionConfig::create($recipe, \dirname(__DIR__, 2))->withDcaFile($path);
+            $mapping = $config->recipe->assets->fileMappings[0];
+
+            $this->assertSame($path, $mapping->source);
+            $this->assertSame('contao/dca/tl_content.php', $mapping->target);
+            $this->assertSame([], $recipe->assets->fileMappings);
+
+            (new ApplicationPreparer())->prepare($config, $directory.'/project', null);
+            $this->assertSame(file_get_contents($path), file_get_contents($directory.'/project/contao/dca/tl_content.php'));
+        } finally {
+            $filesystem->remove($directory);
+        }
     }
 }
