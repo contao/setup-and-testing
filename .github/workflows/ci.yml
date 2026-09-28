@@ -2,10 +2,7 @@ name: CI
 
 on:
     pull_request: ~
-    push:
-        branches:
-            - main
-            - '*.x'
+    push: ~
 
 permissions:
     contents: read
@@ -54,7 +51,7 @@ jobs:
             - name: Validate Composer files
               run: |
                   composer validate --strict
-                  composer validate --strict e2e-test-bundle/composer.json
+                  composer validate --strict e2e-testing/composer.json
                   composer validate --strict installation-recipe/composer.json
                   vendor-bin/monorepo-tools/vendor/bin/monorepo-tools composer-json --validate
 

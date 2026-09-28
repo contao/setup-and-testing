@@ -14,8 +14,6 @@ use Contao\Rector\Set\SetList;
 use Rector\Config\RectorConfig;
 use Rector\Php80\Rector\Class_\ClassPropertyAssignToConstructorPromotionRector;
 use Rector\Php82\Rector\Class_\ReadOnlyClassRector;
-use Rector\Php83\Rector\ClassMethod\AddOverrideAttributeToOverriddenMethodsRector;
-use Rector\Php84\Rector\Class_\DeprecatedAnnotationToDeprecatedAttributeRector;
 use Rector\ValueObject\PhpVersion;
 
 return RectorConfig::configure()
@@ -30,11 +28,9 @@ return RectorConfig::configure()
         __DIR__.'/installation-recipe/tests',
     ])
     ->withSkip([
-        AddOverrideAttributeToOverriddenMethodsRector::class,
         ClassPropertyAssignToConstructorPromotionRector::class => [
             'e2e-testing/src/InstallationLease.php',
         ],
-        DeprecatedAnnotationToDeprecatedAttributeRector::class,
         ReadOnlyClassRector::class,
     ])
     ->withRootFiles()

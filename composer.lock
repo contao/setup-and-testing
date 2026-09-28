@@ -3729,8 +3729,8 @@
     "prefer-lowest": false,
     "platform": {
         "php": "^8.2",
-        "composer-runtime-api": "^2.1",
-        "ext-zip": "*"
+        "ext-zip": "*",
+        "composer-runtime-api": "^2.1"
     },
     "platform-dev": {},
     "plugin-api-version": "2.9.0"

@@ -3,7 +3,8 @@ branch_filter: /^(main|\d+\.\d+)$/
 
 composer:
     require: []
-    require-dev: []
+    require-dev:
+        bamarni/composer-bin-plugin: ^1.4
     conflict: []
 
 repositories:
