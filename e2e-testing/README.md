@@ -1,6 +1,14 @@
 # Contao E2E testing
 
-`contao/e2e-testing` is a regular Composer library that prepares a real Contao Managed Edition, migrates an isolated MySQL/MariaDB database, loads installation recipes, and exposes raw HTTP, BrowserKit, and Playwright clients. It deliberately does not require any Contao bundle, so the test suite selects the Contao version in its recipe.
+`contao/e2e-testing` owns the test runtime. It consumes recipes from `contao/installation-recipe` to prepare a real Contao Managed Edition and migrate an isolated MySQL/MariaDB database. Tests can make direct HTTP requests, use Symfony BrowserKit for HTTP tests without JavaScript, or drive a real browser with Playwright. The test suite selects the Contao version in its recipe because this library does not require a Contao bundle.
+
+Install it as a development dependency in the project under test. Composer also installs `contao/installation-recipe`, which provides the recipe model used below:
+
+```shell
+composer require --dev contao/e2e-testing
+```
+
+## Database setup
 
 If Docker is available, no database setup is needed. The first test starts a reusable `mariadb:11.4` container on a random loopback port. The last E2E process stops it, and subsequent runs restart the same container. Its `/var/lib/mysql` directory is bind-mounted to `.contao-e2e/database/data`, so all generated database files remain inside the project-local E2E workspace. Parallel test workers keep shared leases and only the final worker stops the database. If a process is killed before PHP can run its shutdown handlers, `database:stop` cleans up any remaining containers.
 
@@ -33,6 +41,8 @@ $env:CONTAO_E2E_DATABASE_URL = 'mysql://root:password@127.0.0.1:3306'
 ```
 
 Windows is supported with native PHP, Composer, and Node.js 20 or newer. The automatic database requires Docker Desktop configured for Linux containers. Alternatively, configure an existing MySQL or MariaDB server with `CONTAO_E2E_DATABASE_URL`. Composer creates Windows command proxies for `contao-e2e`, PHPUnit, Playwright, and ParaTest, while the library invokes PHP, Composer, Git, and Docker without relying on a POSIX shell.
+
+## Browser tests
 
 Install the Playwright browser binaries once after requiring the package:
 
@@ -77,6 +87,8 @@ final class LoginTest extends TestCase
     }
 }
 ```
+
+### Backend interactions
 
 `BackendBrowser` wraps recurring Contao backend interactions without imposing another PHPUnit trait or base class. Firefox is the default, while Chromium and WebKit are selected with `BrowserType`. The underlying Playwright page, context, and browser session remain accessible for arbitrary operations and assertions.
 
@@ -123,6 +135,8 @@ Regular Playwright locator auto-waiting remains sufficient for actions that only
 navigating. Use `waitForAjax()` instead when a Contao AJAX callback rebuilds part of a form.
 
 The wrapper also supports buttons and operation links whose title starts with a translated label. `selectFile($field, $path, $expectedValue)` opens Contao's real modal file picker, expands nested directories, applies the selection, and optionally waits until the hidden widget value matches a known UUID.
+
+## Isolation and caching
 
 Use the browser-independent options object when a real browser request must exercise locale negotiation. It maps the accepted languages to an `Accept-Language` header for every browser engine:
 
@@ -172,6 +186,8 @@ Xdebug is disabled for Composer, setup, migration, and other managed subprocesse
 
 `ManagedEdition::resetDatabase()` returns a `FixtureResult`. Call `$result->value('page_home')` to obtain the generated primary key of a named fixture, or pass a second column name to read another resolved value. `$result->interpolate('/pages/{page_home}')` substitutes generated values in paths or other strings.
 
+## Monorepo projects
+
 For monorepos, `MonorepoProject` discovers an explicit root package version or the `dev-main` branch alias and falls back
 to `dev-main` when neither exists. It also reads the package names from local `composer.json` files:
 
@@ -184,6 +200,8 @@ $composer = $monorepo->configureComposer(
     'packages/example-bundle',
 );
 ```
+
+## HTTP tests and maintenance
 
 For HTTP tests without JavaScript, use Symfony's BrowserKit client. It returns a DomCrawler instance and supports links,
 forms, cookies, history, and access to the last response:

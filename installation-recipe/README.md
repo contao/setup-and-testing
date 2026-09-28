@@ -1,6 +1,14 @@
 # Contao installation recipes
 
-`contao/installation-recipe` describes and applies portable installation input without depending on a Contao bundle. A recipe combines a Composer project, ordered Symfony configuration fragments, YAML database fixtures, and files copied into the installation.
+`contao/installation-recipe` owns the portable recipe format and the code that applies a recipe to a supplied installation target. A recipe combines Composer requirements, ordered Symfony configuration fragments, YAML database fixtures, and files copied into the installation. The host application supplies dependency installation and migration operations, so this package can be used by an installer or importer without depending on a Contao bundle or test framework.
+
+Install it in the project that builds or applies recipes:
+
+```shell
+composer require contao/installation-recipe
+```
+
+## Build a recipe in PHP
 
 ```php
 use Contao\InstallationRecipe\Composer\ComposerConfig;
@@ -16,6 +24,8 @@ $recipe = InstallationRecipe::create($composer)
     ->withFixtureFile(__DIR__.'/fixtures/pages.yaml')
     ->withFileMapping(new FileMapping(__DIR__.'/files', 'files'));
 ```
+
+## Database fixtures
 
 Fixture files map table names to rows. Anonymous row lists remain supported, but named rows can reference each other with `@name`. The loader resolves dependencies across tables and fixture files, including forward references. It lets the database assign auto-increment values and substitutes the actual generated identifier wherever the fixture is referenced.
 
@@ -57,7 +67,7 @@ $pageId = $result->value('regular');
 $url = $result->interpolate('/pages/{regular}/{regular->alias}');
 ```
 
-The package is intentionally independent of `contao/core-bundle`, browser tooling, and PHPUnit so the same recipe model can later power an installation or theme importer.
+The package is independent of `contao/core-bundle`, browser tooling, and PHPUnit, so the same recipe model can power an installation or theme importer. For a test runtime that consumes recipes, see [`contao/e2e-testing`](https://github.com/contao/e2e-testing).
 
 ## Portable recipe archives
 
@@ -101,6 +111,8 @@ The optional `composer.json` is deliberately a fragment rather than a complete C
     }
 }
 ```
+
+### Install an archive
 
 Open the archive while it is being installed. Closing it removes the securely extracted temporary directory; the destructor also provides a fallback cleanup. Absolute paths, path traversal, symbolic links, oversized archives, unknown manifest keys, and missing files are rejected before installation.
 
