@@ -29,7 +29,6 @@ final readonly class WorkspaceInitializer
             Path::join($config->rootDirectory, 'cache/composer'),
             Path::join($config->rootDirectory, 'cache/dependency-locks'),
             Path::join($config->rootDirectory, 'cache/installations'),
-            Path::join($config->rootDirectory, 'cache/paratest'),
             Path::join($config->rootDirectory, 'database'),
             Path::join($config->rootDirectory, 'failures'),
             Path::join($config->rootDirectory, 'locks'),

@@ -40,7 +40,7 @@ The PowerShell equivalent on Windows is:
 $env:CONTAO_E2E_DATABASE_URL = 'mysql://root:password@127.0.0.1:3306'
 ```
 
-Windows is supported with native PHP, Composer, and Node.js 20 or newer. The automatic database requires Docker Desktop configured for Linux containers. Alternatively, configure an existing MySQL or MariaDB server with `CONTAO_E2E_DATABASE_URL`. Composer creates Windows command proxies for `contao-e2e`, PHPUnit, Playwright, and ParaTest, while the library invokes PHP, Composer, Git, and Docker without relying on a POSIX shell.
+Windows is supported with native PHP, Composer, and Node.js 20 or newer. The automatic database requires Docker Desktop configured for Linux containers. Alternatively, configure an existing MySQL or MariaDB server with `CONTAO_E2E_DATABASE_URL`. Composer creates Windows command proxies for `contao-e2e`, PHPUnit, and Playwright, while the library invokes PHP, Composer, Git, and Docker without relying on a POSIX shell.
 
 ## Browser tests
 
@@ -158,29 +158,13 @@ Path-package source fingerprints are cached for the lifetime of the PHPUnit proc
 
 Read-only tests with a data provider can avoid repeatedly loading an unchanged fixture set. `prepareDatabase($fixtures)` fingerprints the fixture contents and only resets the database when they change; repeated calls still clear active browser sessions and mutable runtime caches. Use `resetDatabase()` instead whenever a test may have modified database state.
 
-Consumer projects can optionally run independent test-case classes in parallel with ParaTest. ParaTest is deliberately not a dependency of this package because its releases are closely coupled to PHPUnit versions. Install the version Composer selects for the project's PHPUnit version:
+Keep PHPUnit's disposable cache in the E2E workspace by configuring it in `phpunit.xml.dist`:
 
-```shell
-composer require --dev brianium/paratest
+```xml
+<phpunit cacheDirectory=".contao-e2e/cache/phpunit">
 ```
 
-The installation and database pools isolate worker processes, and every worker gets its own Playwright process. Keep data-provider cases in the same process by using ParaTest's default class-level runner rather than `--functional`:
-
-```shell
-XDEBUG_MODE=off vendor/bin/paratest \
-    --testsuite=e2e \
-    --processes=2 \
-    --cache-directory=.contao-e2e/cache/phpunit \
-    --tmp-dir=.contao-e2e/cache/paratest
-```
-
-Use the equivalent PowerShell command on Windows:
-
-```powershell
-$env:XDEBUG_MODE = 'off'; vendor\bin\paratest --testsuite=e2e --processes=2 --cache-directory=.contao-e2e/cache/phpunit --tmp-dir=.contao-e2e/cache/paratest
-```
-
-Create `.contao-e2e/cache/paratest` before starting ParaTest, for example by running `vendor/bin/contao-e2e doctor --quiet`. Projects using Composer bin plugins may isolate ParaTest in a dedicated vendor-bin directory instead.
+Alternatively, pass `--cache-directory=.contao-e2e/cache/phpunit` when running the E2E test suite. This avoids creating a separate `.phpunit.cache/` directory.
 
 Xdebug is disabled for Composer, setup, migration, and other managed subprocesses as well as for the E2E web server. Playwright locators automatically wait for actionable elements and work with Contao's Turbo navigation without manual sleeps.
 
