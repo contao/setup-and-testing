@@ -123,13 +123,29 @@ final readonly class BackendBrowser
      */
     public function waitForNavigation(callable $action): void
     {
-        $marker = '__contaoE2eNavigation'.bin2hex(random_bytes(8));
-        $this->page()->evaluate(
-            '(marker) => { window[marker] = false; document.addEventListener("turbo:render", () => window[marker] = true, { once: true }); }',
-            $marker,
-        );
+        $marker = $this->registerNavigationMarker();
         $action();
         $this->page()->waitForFunction('(marker) => window[marker] !== false', $marker);
+    }
+
+    /**
+     * @param callable(): void $action
+     */
+    public function waitForTurboNavigation(callable $action): void
+    {
+        $marker = $this->registerNavigationMarker();
+        $action();
+        $this->page()->waitForFunction('(marker) => window[marker] === true', $marker);
+    }
+
+    /**
+     * @param callable(): void $action
+     */
+    public function waitForFullNavigation(callable $action): void
+    {
+        $marker = $this->registerNavigationMarker();
+        $action();
+        $this->page()->waitForFunction('(marker) => window[marker] === undefined', $marker);
     }
 
     public function clickLink(string $label): void
@@ -253,5 +269,16 @@ final readonly class BackendBrowser
     private function escapeCssString(string $value): string
     {
         return addcslashes($value, "\\\"\n\r\f");
+    }
+
+    private function registerNavigationMarker(): string
+    {
+        $marker = '__contaoE2eNavigation'.bin2hex(random_bytes(8));
+        $this->page()->evaluate(
+            '(marker) => { window[marker] = false; document.addEventListener("turbo:render", () => window[marker] = true, { once: true }); }',
+            $marker,
+        );
+
+        return $marker;
     }
 }

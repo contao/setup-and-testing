@@ -169,6 +169,17 @@ $backend->waitForNavigation(
 );
 ```
 
+Use `waitForTurboNavigation()` when the action must render through Turbo, or `waitForFullNavigation()` when it must load a new document. Both register a navigation marker before running the action:
+
+```php
+$backend->waitForTurboNavigation(
+    static fn () => $backend->page()->getByRole('link', ['name' => 'Articles'])->click(),
+);
+$backend->waitForFullNavigation(
+    static fn () => $backend->page()->getByRole('link', ['name' => 'Log out'])->click(),
+);
+```
+
 Regular Playwright locator auto-waiting remains sufficient for actions that only update the current page without
 navigating. Use `waitForAjax()` instead when a Contao AJAX callback rebuilds part of a form.
 
