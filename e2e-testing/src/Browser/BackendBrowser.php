@@ -174,7 +174,7 @@ final readonly class BackendBrowser
 
     public function fillRichText(string $field, string $text): void
     {
-        $this->page()->frameLocator('#ctrl_'.$field.'_ifr')->locator('#tinymce')->fill($text);
+        $this->page()->frameLocator('#ctrl_'.$field.'_ifr')->locator('.mce-content-body')->fill($text);
     }
 
     public function selectFile(string $field, string $path, string|null $expectedValue = null): void
