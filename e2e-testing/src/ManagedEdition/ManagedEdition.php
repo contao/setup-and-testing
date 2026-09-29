@@ -193,6 +193,37 @@ final class ManagedEdition
         return $this->currentBrowser->page();
     }
 
+    /**
+     * Finishes the traces of all open browser sessions and writes them to traces.
+     *
+     * @return list<string>
+     */
+    public function finishTracing(string $name, bool $failed): array
+    {
+        $mode = PlaywrightManager::traceMode();
+
+        if (null === $mode) {
+            return [];
+        }
+
+        $keep = 'always' === $mode || $failed;
+        $name = trim((string) preg_replace('/[^A-Za-z0-9._-]+/', '-', $name), '-');
+        $paths = [];
+
+        foreach ($this->browserSessions as $i => $session) {
+            $path = $keep ? Path::join($this->state->config->environment->cache->rootDirectory, 'traces', $name.($i ? '-'.($i + 1) : '').'.zip') : null;
+
+            if (null !== $path) {
+                (new Filesystem())->mkdir(\dirname($path));
+                $paths[] = $path;
+            }
+
+            $session->context()->tracing()->stop(null === $path ? [] : ['path' => $path]);
+        }
+
+        return $paths;
+    }
+
     public function release(): void
     {
         $this->closeBrowserSessions();

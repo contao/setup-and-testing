@@ -13,6 +13,7 @@ declare(strict_types=1);
 namespace Contao\E2eTesting\ManagedEdition;
 
 use PHPUnit\Framework\Assert;
+use PHPUnit\Framework\Attributes\After;
 use PHPUnit\Framework\Attributes\AfterClass;
 use PHPUnit\Framework\Attributes\Before;
 use PHPUnit\Framework\Attributes\BeforeClass;
@@ -70,6 +71,22 @@ trait ManagedEditionTestTrait
 
         if ($this->shouldResetContaoManagedEdition()) {
             self::managedEdition()->resetDatabase();
+        }
+    }
+
+    #[After]
+    protected function finishContaoTracing(): void
+    {
+        if (!self::$contaoManagedEdition) {
+            return;
+        }
+
+        $status = $this->status();
+        $failed = $status->isFailure() || $status->isError();
+        $paths = self::$contaoManagedEdition->finishTracing(static::class.'::'.$this->nameWithDataSet(), $failed);
+
+        foreach ($paths as $path) {
+            fwrite(STDERR, \sprintf("\nPlaywright trace: %s\nOpen it with: npx playwright show-trace %s\n", $path, escapeshellarg($path)));
         }
     }
 
