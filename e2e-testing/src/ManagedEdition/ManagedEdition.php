@@ -198,27 +198,17 @@ final class ManagedEdition
      *
      * @return list<string>
      */
-    public function finishTracing(string $name, bool $failed): array
+    public function finishTracing(string $name): array
     {
-        $mode = PlaywrightManager::traceMode();
-
-        if (null === $mode) {
-            return [];
-        }
-
-        $keep = 'always' === $mode || $failed;
         $name = trim((string) preg_replace('/[^A-Za-z0-9._-]+/', '-', $name), '-');
+        $directory = Path::join($this->state->config->environment->cache->rootDirectory, 'traces');
         $paths = [];
 
+        (new Filesystem())->mkdir($directory);
+
         foreach ($this->browserSessions as $i => $session) {
-            $path = $keep ? Path::join($this->state->config->environment->cache->rootDirectory, 'traces', $name.($i ? '-'.($i + 1) : '').'.zip') : null;
-
-            if (null !== $path) {
-                (new Filesystem())->mkdir(\dirname($path));
-                $paths[] = $path;
-            }
-
-            $session->context()->tracing()->stop(null === $path ? [] : ['path' => $path]);
+            $paths[] = $path = Path::join($directory, $name.($i ? '-'.($i + 1) : '').'.zip');
+            $session->context()->tracing()->stop(['path' => $path]);
         }
 
         return $paths;

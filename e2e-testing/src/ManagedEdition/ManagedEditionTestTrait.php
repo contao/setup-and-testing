@@ -12,6 +12,7 @@ declare(strict_types=1);
 
 namespace Contao\E2eTesting\ManagedEdition;
 
+use Contao\E2eTesting\Browser\PlaywrightManager;
 use PHPUnit\Framework\Assert;
 use PHPUnit\Framework\Attributes\After;
 use PHPUnit\Framework\Attributes\AfterClass;
@@ -77,17 +78,21 @@ trait ManagedEditionTestTrait
     #[After]
     protected function finishContaoTracing(): void
     {
-        if (!self::$contaoManagedEdition) {
-            return;
+        if ('always' === PlaywrightManager::traceMode()) {
+            $this->writeContaoTraces();
+        }
+    }
+
+    /**
+     * @throws \Throwable
+     */
+    protected function onNotSuccessfulTest(\Throwable $t): never
+    {
+        if ('on-failure' === PlaywrightManager::traceMode()) {
+            $this->writeContaoTraces();
         }
 
-        $status = $this->status();
-        $failed = $status->isFailure() || $status->isError();
-        $paths = self::$contaoManagedEdition->finishTracing(static::class.'::'.$this->nameWithDataSet(), $failed);
-
-        foreach ($paths as $path) {
-            fwrite(STDERR, \sprintf("\nPlaywright trace: %s\nOpen it with: npx playwright show-trace %s\n", $path, escapeshellarg($path)));
-        }
+        parent::onNotSuccessfulTest($t);
     }
 
     protected function shouldResetContaoManagedEdition(): bool
@@ -102,5 +107,14 @@ trait ManagedEditionTestTrait
         }
 
         return self::$contaoManagedEdition;
+    }
+
+    private function writeContaoTraces(): void
+    {
+        static $count = 0;
+
+        foreach (self::$contaoManagedEdition?->finishTracing(static::class.'-'.++$count) ?? [] as $path) {
+            fwrite(STDERR, \sprintf("\nPlaywright trace: %s\nOpen it with: npx playwright show-trace %s\n", $path, escapeshellarg($path)));
+        }
     }
 }
