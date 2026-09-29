@@ -13,6 +13,7 @@ declare(strict_types=1);
 namespace Contao\E2eTesting\Browser;
 
 use Playwright\Browser\BrowserInterface;
+use Playwright\Configuration\PlaywrightConfig;
 use Playwright\Configuration\PlaywrightConfigBuilder;
 use Playwright\Exception\PlaywrightExceptionInterface;
 use Playwright\PlaywrightClient;
@@ -21,6 +22,8 @@ use Playwright\PlaywrightFactory;
 final class PlaywrightManager
 {
     private PlaywrightClient|null $playwright = null;
+
+    private PlaywrightConfig|null $config = null;
 
     /**
      * @var array<string, BrowserInterface>
@@ -34,6 +37,7 @@ final class PlaywrightManager
     public function create(BrowserType $type, string $baseUri, BrowserOptions $options): BrowserSession
     {
         $context = $this->browser($type)->newContext($this->optionsNormalizer->normalize($options));
+        $context->setDefaultTimeout($this->config()->timeoutMs);
 
         if (self::traceMode()) {
             $context->tracing()->start(['screenshots' => true, 'snapshots' => true, 'sources' => true]);
@@ -82,13 +86,22 @@ final class PlaywrightManager
 
     private function launch(BrowserType $type): BrowserInterface
     {
-        $playwright = $this->playwright ??= PlaywrightFactory::create(PlaywrightConfigBuilder::fromEnv()->build());
+        // Never go below 30 seconds for the transport, so a low PW_TIMEOUT_MS does not
+        // break launching the browser
+        $playwright = $this->playwright ??= PlaywrightFactory::create(
+            PlaywrightConfigBuilder::fromEnv()->withTimeoutMs(max($this->config()->timeoutMs, 30_000))->build(),
+        );
 
         return match ($type) {
             BrowserType::Chromium => $playwright->chromium()->launch(),
             BrowserType::Firefox => $playwright->firefox()->launch(),
             BrowserType::WebKit => $playwright->webkit()->launch(),
         };
+    }
+
+    private function config(): PlaywrightConfig
+    {
+        return $this->config ??= PlaywrightConfigBuilder::fromEnv()->build();
     }
 
     private function reducedMotion(): string

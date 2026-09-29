@@ -243,6 +243,28 @@ it locally in the browser.
 
 Recording slows down every test, so leave `CONTAO_E2E_TRACE` unset on CI and only enable it for a local run.
 
+### Playwright options
+
+The Playwright configuration can be adjusted using environment variables, so you can change its options without
+modifying the tests. The most useful options are:
+
+| Variable        | Default | Behavior                                                     |
+|-----------------|---------|--------------------------------------------------------------|
+| `PW_TIMEOUT_MS` | `30000` | Timeout for browser actions, waits and navigations           |
+| `PW_HEADLESS`   | `true`  | Set to `false` to watch the browser while the tests run      |
+| `PW_SLOWMO_MS`  | `0`     | Slows down every browser operation by the given amount       |
+| `PW_CHANNEL`    |         | Uses an installed browser channel, e.g. `chrome` or `msedge` |
+
+For example, lower the timeout to let a broken test fail fast while writing it, or raise it on a slow machine:
+
+```shell
+PW_TIMEOUT_MS=1000 vendor/bin/phpunit --testsuite=e2e
+```
+
+Set the variables in your shell for a single run, or add them to a local `phpunit.xml`, e.g.
+`<env name="PW_TIMEOUT_MS" value="1000"/>`, to keep them for every local run. The connection to the Playwright server
+never uses less than 30 seconds, so launching the browser still works with a low timeout.
+
 ## Isolation and caching
 
 Use the browser-independent options object when a real browser request must exercise locale negotiation. It maps the accepted languages to an `Accept-Language` header for every browser engine:
