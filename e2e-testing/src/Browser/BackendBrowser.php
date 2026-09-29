@@ -114,9 +114,9 @@ final readonly class BackendBrowser
     }
 
     /**
-     * Executes an action and waits for either a Turbo render or a new document.
+     * Executes an action and waits for either a Turbo visit or a new document.
      *
-     * Playwright does not recognize Turbo renders as browser navigations. The marker
+     * Playwright does not recognize Turbo visits as browser navigations. The marker
      * lets the synchronous PHP bridge register the event listener before the action.
      *
      * @param callable(): void $action
@@ -125,7 +125,7 @@ final readonly class BackendBrowser
     {
         $marker = $this->registerNavigationMarker();
         $action();
-        $this->page()->waitForFunction('(marker) => window[marker] !== false', $marker);
+        $this->page()->waitForFunction('(marker) => window[marker] === true || (window[marker] === undefined && document.readyState !== "loading")', $marker);
     }
 
     /**
@@ -145,7 +145,7 @@ final readonly class BackendBrowser
     {
         $marker = $this->registerNavigationMarker();
         $action();
-        $this->page()->waitForFunction('(marker) => window[marker] === undefined', $marker);
+        $this->page()->waitForFunction('(marker) => window[marker] === undefined && document.readyState !== "loading"', $marker);
     }
 
     public function clickLink(string $label): void
@@ -275,7 +275,7 @@ final readonly class BackendBrowser
     {
         $marker = '__contaoE2eNavigation'.bin2hex(random_bytes(8));
         $this->page()->evaluate(
-            '(marker) => { window[marker] = false; document.addEventListener("turbo:render", () => window[marker] = true, { once: true }); }',
+            '(marker) => { window[marker] = false; document.addEventListener("turbo:load", () => window[marker] = true, { once: true }); }',
             $marker,
         );
 
