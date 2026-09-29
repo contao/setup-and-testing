@@ -118,7 +118,7 @@ From the bundle root, run:
 vendor/bin/phpunit --configuration=phpunit.xml.dist tests/E2e/ManagedEditionSmokeTest.php
 ```
 
-`withPathPackage()` makes Composer require your bundle from its local directory and symlink it into the Managed Edition's `vendor/`. The test sees the current working tree, including uncommitted PHP changes. Source changes invalidate the cached application setup on the next test process. If you change the bundle's Composer dependencies, use `CONTAO_E2E_NO_CACHE=1` for a fresh dependency installation.
+`withPathPackage()` makes Composer require your bundle from its local directory and symlink it into the Managed Edition's `vendor/`. The test sees the current working tree, including uncommitted PHP changes. Source changes invalidate the cached application setup on the next test process. Changes to a linked bundle's `composer.json` select a fresh dependency installation so Composer resolves the new requirements.
 
 The trait works with PHPUnit 10 through 13 and does not impose a test base class. Once the smoke test runs, replace its login-page assertion with checks for your bundle's behavior. Add database fixtures with `InstallationRecipe::withFixtureFile()` when the test needs existing pages or backend users.
 

@@ -14,6 +14,8 @@ namespace Contao\E2eTesting\Tests;
 
 use Contao\E2eTesting\Cache\FingerprintCalculator;
 use Contao\E2eTesting\Cache\SourceFingerprint;
+use Contao\E2eTesting\Cache\WorkspaceInitializer;
+use Contao\E2eTesting\Installation\InstallationPool;
 use Contao\E2eTesting\ManagedEdition\ManagedEditionConfig;
 use Contao\InstallationRecipe\Composer\ComposerConfig;
 use Contao\InstallationRecipe\Recipe\InstallationRecipe;
@@ -66,12 +68,51 @@ final class FingerprintCalculatorTest extends TestCase
         }
     }
 
+    public function testLinkedComposerDependenciesSelectAFreshInstallation(): void
+    {
+        $directory = $this->createInputDirectory();
+        $filesystem = new Filesystem();
+        $config = $this->config($directory);
+        $calculator = new FingerprintCalculator();
+        $cache = $config->environment->cache;
+        (new WorkspaceInitializer())->initialize($cache);
+        $pool = new InstallationPool();
+
+        try {
+            $initial = $calculator->calculate($config);
+            $first = $pool->acquire($cache, $initial->dependency);
+            $firstDirectory = $first->directory;
+
+            try {
+                $filesystem->mkdir($firstDirectory.'/project/vendor');
+            } finally {
+                $first->release();
+            }
+
+            $filesystem->dumpFile($directory.'/source/composer.json', '{"name":"acme/example","require":{"acme/new-editor":"^1.0"}}');
+            $changed = $calculator->calculate($config);
+            $second = $pool->acquire($cache, $changed->dependency);
+
+            try {
+                $this->assertNotSame($initial->dependency, $changed->dependency);
+                $this->assertNotSame($firstDirectory, $second->directory);
+                $this->assertDirectoryExists($firstDirectory.'/project/vendor');
+                $this->assertDirectoryDoesNotExist($second->directory.'/project/vendor');
+            } finally {
+                $second->release();
+            }
+        } finally {
+            $filesystem->remove($directory);
+        }
+    }
+
     private function createInputDirectory(): string
     {
         $directory = \dirname(__DIR__, 2).'/.contao-e2e/runtime/unit-tests/fingerprint-'.bin2hex(random_bytes(6));
         $filesystem = new Filesystem();
         $filesystem->mkdir([$directory, $directory.'/source']);
         $filesystem->dumpFile($directory.'/source/Example.php', '<?php return 1;');
+        $filesystem->dumpFile($directory.'/source/composer.json', '{"name":"acme/example","require":{"acme/old-editor":"^1.0"}}');
         $filesystem->dumpFile($directory.'/config.yaml', "contao:\n  csrf_cookie_prefix: initial\n");
         $filesystem->dumpFile($directory.'/fixture.yaml', "example:\n  - id: 1\n");
         $filesystem->dumpFile($directory.'/tl_content.php', '<?php $GLOBALS["TL_DCA"]["tl_content"]["fields"]["example"]["eval"]["mandatory"] = false;');

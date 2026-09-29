@@ -14,6 +14,7 @@ namespace Contao\E2eTesting\Cache;
 
 use Contao\E2eTesting\ManagedEdition\ManagedEditionConfig;
 use Contao\InstallationRecipe\File\FileMapping;
+use Symfony\Component\Filesystem\Path;
 
 final readonly class FingerprintCalculator
 {
@@ -28,6 +29,10 @@ final readonly class FingerprintCalculator
         $composer = $config->environment->composer;
         $dependency = $this->hash([
             $recipe->composer->toArray($projectDirectory),
+            $this->hashFiles(array_map(
+                static fn ($package) => Path::join($package->path, 'composer.json'),
+                $recipe->composer->pathPackages(),
+            )),
             \PHP_VERSION_ID,
             PHP_OS_FAMILY,
             $composer->executable,
