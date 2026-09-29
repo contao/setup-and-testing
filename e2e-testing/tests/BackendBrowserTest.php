@@ -26,9 +26,9 @@ final class BackendBrowserTest extends TestCase
      */
     public static function navigationModes(): iterable
     {
-        yield 'either' => ['waitForNavigation', '(marker) => window[marker] !== false'];
+        yield 'either' => ['waitForNavigation', '(marker) => window[marker] === true || (window[marker] === undefined && document.readyState !== "loading")'];
         yield 'turbo' => ['waitForTurboNavigation', '(marker) => window[marker] === true'];
-        yield 'full page' => ['waitForFullNavigation', '(marker) => window[marker] === undefined'];
+        yield 'full page' => ['waitForFullNavigation', '(marker) => window[marker] === undefined && document.readyState !== "loading"'];
     }
 
     #[DataProvider('navigationModes')]
@@ -38,7 +38,7 @@ final class BackendBrowserTest extends TestCase
         $page
             ->expects($this->once())
             ->method('evaluate')
-            ->with($this->stringContains('turbo:render'), $this->anything())
+            ->with($this->stringContains('turbo:load'), $this->anything())
         ;
 
         $page
