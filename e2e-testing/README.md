@@ -61,41 +61,66 @@ vendor/bin/playwright-install --browsers
 
 Use `vendor/bin/playwright-install --with-deps` on a fresh Linux CI runner to install the required system libraries as well. Playwright caches matching Chromium, Firefox, and WebKit binaries outside the project and reuses them between runs.
 
-Use the trait with PHPUnit 10 through 13; no test base class is imposed:
+### Test a bundle from its working tree
+
+The following example lives in a Contao bundle repository, not in this library. Install `contao/e2e-testing` as a development dependency as shown above, then put this test in `tests/E2e/ManagedEditionSmokeTest.php`. Replace `acme/example-bundle` with the `name` from your bundle's `composer.json` and choose a version that satisfies its Composer constraints. The version does not have to match the name of your current Git branch.
 
 ```php
-use Contao\E2eTesting\Browser\BrowserOptions;
+<?php
+
+declare(strict_types=1);
+
 use Contao\E2eTesting\ManagedEdition\ManagedEditionConfig;
 use Contao\E2eTesting\ManagedEdition\ManagedEditionTestTrait;
 use Contao\InstallationRecipe\Composer\ComposerConfig;
 use Contao\InstallationRecipe\Recipe\InstallationRecipe;
 use PHPUnit\Framework\TestCase;
 
-final class LoginTest extends TestCase
+final class ManagedEditionSmokeTest extends TestCase
 {
     use ManagedEditionTestTrait;
 
     protected static function createManagedEditionConfig(): ManagedEditionConfig
     {
+        $bundleRoot = dirname(__DIR__, 2);
         $composer = ComposerConfig::managedEdition('^5.7')
-            ->withPathPackage('acme/example-bundle', dirname(__DIR__), '1.0.x-dev');
+            ->withPathPackage('acme/example-bundle', $bundleRoot, '1.0.x-dev');
 
-        return ManagedEditionConfig::create(
-            InstallationRecipe::create($composer)->withFixtureFile(__DIR__.'/fixtures.yaml'),
-            dirname(__DIR__),
-        );
+        return ManagedEditionConfig::create(InstallationRecipe::create($composer), $bundleRoot);
     }
 
-    public function testLoginPage(): void
+    public function testBackendLoginPage(): void
     {
         $backend = self::managedEdition()->createBackendBrowser();
         $backend->visit('/contao/login');
-        $backend->submitLogin('admin', 'password');
 
-        $this->assertSelectorTextContains('body', 'Contao');
+        $this->assertSelectorExists('input[name="username"]');
     }
 }
 ```
+
+Add `tests/E2e` to your existing PHPUnit test suite, or use this minimal `phpunit.xml.dist` in the bundle root:
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<phpunit bootstrap="vendor/autoload.php" cacheDirectory=".contao-e2e/cache/phpunit">
+  <testsuites>
+    <testsuite name="e2e">
+      <directory>tests/E2e</directory>
+    </testsuite>
+  </testsuites>
+</phpunit>
+```
+
+From the bundle root, run:
+
+```shell
+vendor/bin/phpunit --configuration=phpunit.xml.dist tests/E2e/ManagedEditionSmokeTest.php
+```
+
+`withPathPackage()` makes Composer require your bundle from its local directory and symlink it into the Managed Edition's `vendor/`. The test sees the current working tree, including uncommitted PHP changes. Source changes invalidate the cached application setup on the next test process. If you change the bundle's Composer dependencies, use `CONTAO_E2E_NO_CACHE=1` for a fresh dependency installation.
+
+The trait works with PHPUnit 10 through 13 and does not impose a test base class. Once the smoke test runs, replace its login-page assertion with checks for your bundle's behavior. Add database fixtures with `InstallationRecipe::withFixtureFile()` when the test needs existing pages or backend users.
 
 ### Test-specific DCA
 
