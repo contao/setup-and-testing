@@ -34,10 +34,24 @@ final class PlaywrightManager
     public function create(BrowserType $type, string $baseUri, BrowserOptions $options): BrowserSession
     {
         $context = $this->browser($type)->newContext($this->optionsNormalizer->normalize($options));
+
+        if (self::traceMode()) {
+            $context->tracing()->start(['screenshots' => true, 'snapshots' => true, 'sources' => true]);
+        }
+
         $page = $context->newPage();
         $page->emulateMedia(['reducedMotion' => $this->reducedMotion()]);
 
         return new BrowserSession($baseUri, $context, $page);
+    }
+
+    public static function traceMode(): string|null
+    {
+        return match (getenv('CONTAO_E2E_TRACE')) {
+            'always' => 'always',
+            'on-failure' => 'on-failure',
+            default => null,
+        };
     }
 
     public function close(): void

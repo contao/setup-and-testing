@@ -12,7 +12,9 @@ declare(strict_types=1);
 
 namespace Contao\E2eTesting\ManagedEdition;
 
+use Contao\E2eTesting\Browser\PlaywrightManager;
 use PHPUnit\Framework\Assert;
+use PHPUnit\Framework\Attributes\After;
 use PHPUnit\Framework\Attributes\AfterClass;
 use PHPUnit\Framework\Attributes\Before;
 use PHPUnit\Framework\Attributes\BeforeClass;
@@ -73,6 +75,26 @@ trait ManagedEditionTestTrait
         }
     }
 
+    #[After]
+    protected function finishContaoTracing(): void
+    {
+        if ('always' === PlaywrightManager::traceMode()) {
+            $this->writeContaoTraces();
+        }
+    }
+
+    /**
+     * @throws \Throwable
+     */
+    protected function onNotSuccessfulTest(\Throwable $t): never
+    {
+        if ('on-failure' === PlaywrightManager::traceMode()) {
+            $this->writeContaoTraces();
+        }
+
+        parent::onNotSuccessfulTest($t);
+    }
+
     protected function shouldResetContaoManagedEdition(): bool
     {
         return true;
@@ -85,5 +107,14 @@ trait ManagedEditionTestTrait
         }
 
         return self::$contaoManagedEdition;
+    }
+
+    private function writeContaoTraces(): void
+    {
+        static $count = 0;
+
+        foreach (self::$contaoManagedEdition?->finishTracing(static::class.'-'.++$count) ?? [] as $path) {
+            fwrite(STDERR, \sprintf("\nPlaywright trace: %s\nOpen it with: npx playwright show-trace %s\n", $path, escapeshellarg($path)));
+        }
     }
 }

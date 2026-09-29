@@ -210,6 +210,39 @@ navigating. Use `waitForAjax()` instead when a Contao AJAX callback rebuilds par
 
 The wrapper also supports buttons and operation links whose title starts with a translated label. `selectFile($field, $path, $expectedValue)` opens Contao's real modal file picker, expands nested directories, applies the selection, and optionally waits until the hidden widget value matches a known UUID.
 
+### Traces
+
+Traces are meant for debugging failing tests locally and is disabled by default.
+Set `CONTAO_E2E_TRACE` to record a [Playwright trace](https://playwright.dev/docs/trace-viewer) for every browser
+session. A trace contains a DOM snapshot and screenshot for every action as well as network requests, console messages
+and sources, so a failure can be inspected step by step after the run:
+
+| Value        | Behavior                                  |
+|--------------|-------------------------------------------|
+| `on-failure` | Record every test, keep failed tests only |
+| `always`     | Record and keep every test                |
+
+Set the variable in your shell for a single run, or add it to a local `phpunit.xml` with
+`<env name="CONTAO_E2E_TRACE" value="on-failure"/>` to keep it enabled for every local run:
+
+```shell
+CONTAO_E2E_TRACE=on-failure vendor/bin/phpunit --testsuite=e2e
+```
+
+```shell
+CONTAO_E2E_TRACE=always vendor/bin/phpunit --testsuite=e2e
+```
+
+```shell
+npx playwright show-trace .contao-e2e/traces/<TestClass>-<test>.zip
+```
+
+The path of each written trace is printed in the CLI. The Playwright CLI is installed together with the browsers by
+`vendor/bin/playwright-install`. You can alternatively drop the file on https://trace.playwright.dev, which will open
+it locally in the browser.
+
+Recording slows down every test, so leave `CONTAO_E2E_TRACE` unset on CI and only enable it for a local run.
+
 ## Isolation and caching
 
 Use the browser-independent options object when a real browser request must exercise locale negotiation. It maps the accepted languages to an `Accept-Language` header for every browser engine:

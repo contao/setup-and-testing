@@ -193,6 +193,27 @@ final class ManagedEdition
         return $this->currentBrowser->page();
     }
 
+    /**
+     * Finishes the traces of all open browser sessions and writes them to traces.
+     *
+     * @return list<string>
+     */
+    public function finishTracing(string $name): array
+    {
+        $name = trim((string) preg_replace('/[^A-Za-z0-9._-]+/', '-', $name), '-');
+        $directory = Path::join($this->state->config->environment->cache->rootDirectory, 'traces');
+        $paths = [];
+
+        (new Filesystem())->mkdir($directory);
+
+        foreach ($this->browserSessions as $i => $session) {
+            $paths[] = $path = Path::join($directory, $name.($i ? '-'.($i + 1) : '').'.zip');
+            $session->context()->tracing()->stop(['path' => $path]);
+        }
+
+        return $paths;
+    }
+
     public function release(): void
     {
         $this->closeBrowserSessions();
