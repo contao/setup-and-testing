@@ -29,11 +29,11 @@ final readonly class DatabaseReadinessProbe
 
         do {
             try {
-                $connection = DriverManager::getConnection(new DsnParser([
+                $connection = DriverManager::getConnection((new DsnParser([
                     'mysql' => 'pdo_mysql',
                     'pdo-mysql' => 'pdo_mysql',
                     'mysqli' => 'mysqli',
-                ])->parse($config->url));
+                ]))->parse($config->url));
                 $connection->executeQuery('SELECT 1');
                 $connection->close();
 

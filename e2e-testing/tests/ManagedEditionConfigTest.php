@@ -43,10 +43,11 @@ final class ManagedEditionConfigTest extends TestCase
         $recipe = InstallationRecipe::create(ComposerConfig::managedEdition('^5.7'));
         $database = DockerDatabaseConfig::mysql('mysql:8.0');
         $config = ManagedEditionConfig::create($recipe, \dirname(__DIR__, 2))->withDatabase($database);
+        $service = $config->dockerServices()[0];
 
         $this->assertSame($database, $config->environment->database);
-        $this->assertInstanceOf(DockerDatabaseService::class, $config->dockerServices()[0]);
-        $this->assertSame($database, $config->dockerServices()[0]->config);
+        $this->assertInstanceOf(DockerDatabaseService::class, $service);
+        $this->assertSame($database, $service->config);
     }
 
     public function testDockerServicesForDifferentProjectsHaveDifferentFingerprints(): void
