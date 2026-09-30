@@ -21,6 +21,13 @@ final readonly class DockerClient
 
     private const DATABASE_CONFIG_LABEL = 'org.contao.e2e.database-config';
 
+    /**
+     * @param non-empty-list<string> $command
+     */
+    public function __construct(private array $command = ['docker'])
+    {
+    }
+
     public function isRunning(string $container): bool
     {
         return 'true' === $this->optional(['inspect', '--format', '{{.State.Running}}', $container]);
@@ -146,6 +153,6 @@ final readonly class DockerClient
      */
     private function process(array $arguments): Process
     {
-        return new Process(['docker', ...$arguments]);
+        return new Process([...$this->command, ...$arguments]);
     }
 }

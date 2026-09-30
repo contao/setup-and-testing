@@ -16,6 +16,8 @@ use Contao\E2eTesting\Cache\CacheConfig;
 use Contao\E2eTesting\Database\DatabaseResetMode;
 use Contao\E2eTesting\Database\DatabaseServerConfig;
 use Contao\E2eTesting\Database\DockerDatabaseConfig;
+use Contao\E2eTesting\Database\DockerDatabaseService;
+use Contao\E2eTesting\Docker\DockerServiceInterface;
 use Contao\InstallationRecipe\File\FileMapping;
 use Contao\InstallationRecipe\Recipe\InstallationRecipe;
 
@@ -45,6 +47,21 @@ final readonly class ManagedEditionConfig
     public function withDatabase(DatabaseServerConfig|DockerDatabaseConfig $database): self
     {
         return $this->withEnvironment($this->environment->withDatabase($database));
+    }
+
+    /**
+     * @return list<DockerServiceInterface>
+     */
+    public function dockerServices(): array
+    {
+        if ($this->environment->database instanceof DatabaseServerConfig) {
+            return [];
+        }
+
+        return [new DockerDatabaseService(
+            $this->environment->cache,
+            $this->environment->database ?? DockerDatabaseConfig::fromEnvironment(),
+        )];
     }
 
     public function withDcaFile(string $path): self
