@@ -16,6 +16,8 @@ use Symfony\Component\Filesystem\Path;
 
 final readonly class CacheConfig
 {
+    public const FORMAT_VERSION = 1;
+
     private function __construct(
         public string $projectDirectory,
         public string $rootDirectory,
@@ -36,5 +38,20 @@ final readonly class CacheConfig
     public function withRootDirectory(string $rootDirectory): self
     {
         return new self($this->projectDirectory, Path::makeAbsolute($rootDirectory, $this->projectDirectory));
+    }
+
+    public function composerCacheDirectory(): string
+    {
+        return Path::join($this->rootDirectory, 'cache/composer');
+    }
+
+    public function dependencyLocksDirectory(): string
+    {
+        return Path::join($this->rootDirectory, 'cache/dependency-locks');
+    }
+
+    public function installationsDirectory(): string
+    {
+        return Path::join($this->rootDirectory, 'cache/installations');
     }
 }

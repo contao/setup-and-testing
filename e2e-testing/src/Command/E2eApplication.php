@@ -23,6 +23,7 @@ final class E2eApplication extends Application
         $this->addCommands([
             new DoctorCommand(),
             new CacheClearCommand(),
+            new CacheMetadataCommand(),
             new DatabaseStopCommand(),
             new FailuresClearCommand(),
         ]);

@@ -18,8 +18,10 @@ use Symfony\Component\Filesystem\Path;
 
 final readonly class FingerprintCalculator
 {
-    public function __construct(private SourceFingerprintInterface $sourceFingerprint = new ProcessCachedSourceFingerprint())
-    {
+    public function __construct(
+        private SourceFingerprintInterface $sourceFingerprint = new ProcessCachedSourceFingerprint(),
+        private ValueFingerprint $valueFingerprint = new ValueFingerprint(),
+    ) {
     }
 
     public function calculate(ManagedEditionConfig $config): FingerprintSet
@@ -27,7 +29,7 @@ final readonly class FingerprintCalculator
         $recipe = $config->recipe;
         $projectDirectory = $config->environment->cache->projectDirectory;
         $composer = $config->environment->composer;
-        $dependency = $this->hash([
+        $dependency = $this->valueFingerprint->calculate([
             $recipe->composer->toArray($projectDirectory),
             $this->hashFiles(array_map(
                 static fn ($package) => Path::join($package->path, 'composer.json'),
@@ -45,21 +47,16 @@ final readonly class FingerprintCalculator
             $sources[$package->package] = $this->sourceFingerprint->calculate($package->path);
         }
 
-        $application = $this->hash([
+        $application = $this->valueFingerprint->calculate([
             $dependency,
             $config->appEnvironment,
             $sources,
             $this->hashFiles(array_map(static fn ($fragment) => $fragment->path, $recipe->assets->configFragments)),
             $this->hashMappings($recipe->assets->fileMappings),
         ]);
-        $data = $this->hash([$application, $this->hashFiles($recipe->fixtures->files)]);
+        $data = $this->valueFingerprint->calculate([$application, $this->hashFiles($recipe->fixtures->files)]);
 
         return new FingerprintSet($dependency, $application, $data);
-    }
-
-    private function hash(mixed $value): string
-    {
-        return hash('sha256', serialize($value));
     }
 
     /**
