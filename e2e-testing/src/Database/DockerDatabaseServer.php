@@ -13,6 +13,7 @@ declare(strict_types=1);
 namespace Contao\E2eTesting\Database;
 
 use Contao\E2eTesting\Cache\CacheConfig;
+use Contao\E2eTesting\Cache\WorkspaceInitializer;
 use Contao\E2eTesting\Exception\DockerUnavailableException;
 use Contao\E2eTesting\Exception\E2eTestException;
 use Symfony\Component\Filesystem\Filesystem;
@@ -25,10 +26,44 @@ final readonly class DockerDatabaseServer
         private DatabaseReadinessProbe $readinessProbe = new DatabaseReadinessProbe(),
         private Filesystem $filesystem = new Filesystem(),
         private DockerDatabaseLeaseRegistry $leaseRegistry = new DockerDatabaseLeaseRegistry(),
+        private WorkspaceInitializer $workspaceInitializer = new WorkspaceInitializer(),
     ) {
     }
 
     public function provide(CacheConfig $cache, DockerDatabaseConfig $database): DatabaseServerConfig
+    {
+        $config = $this->startContainer($cache, $database);
+        $this->readinessProbe->wait($config);
+
+        return $config;
+    }
+
+    public function warmUp(CacheConfig $cache, DockerDatabaseConfig ...$databases): void
+    {
+        $this->workspaceInitializer->initialize($cache);
+
+        foreach ($databases as $database) {
+            $this->startContainer($cache, $database);
+        }
+    }
+
+    public function stop(CacheConfig $cache, bool $force = false): void
+    {
+        $containers = $this->docker->find($this->containerPrefix($cache));
+        $locks = $force ? [] : $this->acquireStopLocks($cache, $containers);
+
+        try {
+            foreach ($containers as $container) {
+                $this->docker->stop($container);
+            }
+        } finally {
+            foreach ($locks as $lock) {
+                $lock->release();
+            }
+        }
+    }
+
+    private function startContainer(CacheConfig $cache, DockerDatabaseConfig $database): DatabaseServerConfig
     {
         $container = $this->containerName($cache, $database);
         $leasePath = $this->leasePath($cache, $container);
@@ -52,25 +87,7 @@ final readonly class DockerDatabaseServer
             fclose($lock);
         }
 
-        $this->readinessProbe->wait($config);
-
         return $config;
-    }
-
-    public function stop(CacheConfig $cache, bool $force = false): void
-    {
-        $containers = $this->docker->find($this->containerPrefix($cache));
-        $locks = $force ? [] : $this->acquireStopLocks($cache, $containers);
-
-        try {
-            foreach ($containers as $container) {
-                $this->docker->stop($container);
-            }
-        } finally {
-            foreach ($locks as $lock) {
-                $lock->release();
-            }
-        }
     }
 
     private function start(CacheConfig $cache, DockerDatabaseConfig $database): DatabaseServerConfig

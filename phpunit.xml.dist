@@ -3,9 +3,16 @@
          bootstrap="vendor/autoload.php"
          cacheDirectory=".contao-e2e/cache/phpunit">
   <testsuites>
-    <testsuite name="packages">
+    <testsuite name="installation-recipe">
       <directory>installation-recipe/tests</directory>
+    </testsuite>
+    <testsuite name="e2e-testing">
       <directory>e2e-testing/tests</directory>
     </testsuite>
   </testsuites>
+  <extensions>
+    <bootstrap class="Contao\E2eTesting\PhpUnit\DockerWarmUpExtension">
+      <parameter name="testsuites" value="e2e-testing"/>
+    </bootstrap>
+  </extensions>
 </phpunit>

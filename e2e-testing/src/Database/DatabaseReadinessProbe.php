@@ -18,18 +18,22 @@ use Doctrine\DBAL\Tools\DsnParser;
 
 final readonly class DatabaseReadinessProbe
 {
+    public function __construct(private float $timeout = 60)
+    {
+    }
+
     public function wait(DatabaseServerConfig $config): void
     {
-        $deadline = microtime(true) + 60;
+        $deadline = microtime(true) + $this->timeout;
         $lastException = null;
 
         do {
             try {
-                $connection = DriverManager::getConnection(new DsnParser([
+                $connection = DriverManager::getConnection((new DsnParser([
                     'mysql' => 'pdo_mysql',
                     'pdo-mysql' => 'pdo_mysql',
                     'mysqli' => 'mysqli',
-                ])->parse($config->url));
+                ]))->parse($config->url));
                 $connection->executeQuery('SELECT 1');
                 $connection->close();
 
@@ -40,6 +44,6 @@ final readonly class DatabaseReadinessProbe
             }
         } while (microtime(true) < $deadline);
 
-        throw new DockerUnavailableException('The Docker MariaDB server did not become ready within 60 seconds: '.$lastException->getMessage(), 0, $lastException);
+        throw new DockerUnavailableException(\sprintf('The Docker MariaDB server did not become ready within %g seconds: %s', $this->timeout, $lastException->getMessage()), 0, $lastException);
     }
 }

@@ -12,10 +12,19 @@ declare(strict_types=1);
 
 namespace Contao\E2eTesting\Tests\Fixture;
 
-use Contao\E2eTesting\ManagedEdition\ManagedEditionTestTrait;
-use PHPUnit\Framework\TestCase;
+use Contao\E2eTesting\Database\DockerDatabaseConfig;
+use Contao\E2eTesting\ManagedEdition\AbstractManagedEditionTestCase as BaseManagedEditionTestCase;
+use Contao\E2eTesting\ManagedEdition\ManagedEditionConfig;
+use Contao\InstallationRecipe\Composer\ComposerConfig;
+use Contao\InstallationRecipe\Recipe\InstallationRecipe;
 
-abstract class AbstractManagedEditionTestCase extends TestCase
+abstract class AbstractManagedEditionTestCase extends BaseManagedEditionTestCase
 {
-    use ManagedEditionTestTrait;
+    protected static function createManagedEditionConfig(): ManagedEditionConfig
+    {
+        return ManagedEditionConfig::create(
+            InstallationRecipe::create(ComposerConfig::managedEdition('^5.7')),
+            \dirname(__DIR__, 2),
+        )->withDatabase(DockerDatabaseConfig::mysql());
+    }
 }

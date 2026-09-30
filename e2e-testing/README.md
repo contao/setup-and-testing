@@ -21,7 +21,53 @@ $mariaDb = $config->withDatabase(DockerDatabaseConfig::mariaDb('mariadb:10.11'))
 $mysql = $config->withDatabase(DockerDatabaseConfig::mysql('mysql:8.0'));
 ```
 
-Different types and image versions use independent reusable containers and storage directories. This makes those configurations suitable for a PHPUnit data provider or separate CI jobs. A CI matrix can configure the same tests without changing PHP code:
+Different types and image versions use independent reusable containers and storage directories. This makes those configurations suitable for a PHPUnit data provider or separate CI jobs.
+
+Database warm-up is optional. Without the extension, each test starts its database variant on demand and waits until it is ready. When one PHPUnit run uses several database images, enable the PHPUnit extension in the E2E configuration to start them earlier:
+
+```xml
+<extensions>
+  <bootstrap class="Contao\E2eTesting\PhpUnit\DockerWarmUpExtension">
+    <parameter name="testsuites" value="e2e"/>
+  </bootstrap>
+</extensions>
+```
+
+The comma-separated `testsuites` parameter selects the PHPUnit suites whose Docker services should be warmed. `ManagedEditionConfig::dockerServices()` exposes the services implied by the configuration, and `AbstractManagedEditionTestCase` implements the provider by returning that collection. The complete bundle example below uses this base class.
+
+If a test already has another base class, it can continue using `ManagedEditionTestTrait` and advertise services directly by implementing `DockerServiceProviderInterface`:
+
+```php
+use Contao\E2eTesting\Docker\DockerServiceProviderInterface;
+use Contao\E2eTesting\ManagedEdition\ManagedEditionConfig;
+use Contao\E2eTesting\ManagedEdition\ManagedEditionTestTrait;
+use Contao\InstallationRecipe\Composer\ComposerConfig;
+use Contao\InstallationRecipe\Recipe\InstallationRecipe;
+use PHPUnit\Framework\TestCase;
+
+final class ManagedEditionSmokeTest extends TestCase implements DockerServiceProviderInterface
+{
+    use ManagedEditionTestTrait;
+
+    protected static function createManagedEditionConfig(): ManagedEditionConfig
+    {
+        $bundleRoot = dirname(__DIR__, 2);
+        $composer = ComposerConfig::managedEdition('^5.7')
+            ->withPathPackage('acme/example-bundle', $bundleRoot, '1.0.x-dev');
+
+        return ManagedEditionConfig::create(InstallationRecipe::create($composer), $bundleRoot);
+    }
+
+    public static function dockerServices(): iterable
+    {
+        return static::createManagedEditionConfig()->dockerServices();
+    }
+}
+```
+
+When a selected suite starts, the extension collects and deduplicates its services before warming them without waiting for readiness. Tests still wait for a service when they first use it. A subclass can advertise additional services by overriding `dockerServices()`, yielding from `parent::dockerServices()`, and then yielding its own services. Other suites, such as `unit`, do not start Docker. The provider mechanism is independent of `ManagedEditionTestTrait`, and future service types such as Redis can implement `DockerServiceInterface` without changing the PHPUnit extension.
+
+A CI matrix can configure the same tests without changing PHP code:
 
 ```shell
 CONTAO_E2E_DATABASE_TYPE=mysql CONTAO_E2E_DATABASE_IMAGE=mysql:8.0 composer e2e-tests
@@ -70,16 +116,13 @@ The following example lives in a Contao bundle repository, not in this library. 
 
 declare(strict_types=1);
 
+use Contao\E2eTesting\ManagedEdition\AbstractManagedEditionTestCase;
 use Contao\E2eTesting\ManagedEdition\ManagedEditionConfig;
-use Contao\E2eTesting\ManagedEdition\ManagedEditionTestTrait;
 use Contao\InstallationRecipe\Composer\ComposerConfig;
 use Contao\InstallationRecipe\Recipe\InstallationRecipe;
-use PHPUnit\Framework\TestCase;
 
-final class ManagedEditionSmokeTest extends TestCase
+final class ManagedEditionSmokeTest extends AbstractManagedEditionTestCase
 {
-    use ManagedEditionTestTrait;
-
     protected static function createManagedEditionConfig(): ManagedEditionConfig
     {
         $bundleRoot = dirname(__DIR__, 2);
@@ -109,6 +152,11 @@ Add `tests/E2e` to your existing PHPUnit test suite, or use this minimal `phpuni
       <directory>tests/E2e</directory>
     </testsuite>
   </testsuites>
+  <extensions>
+    <bootstrap class="Contao\E2eTesting\PhpUnit\DockerWarmUpExtension">
+      <parameter name="testsuites" value="e2e"/>
+    </bootstrap>
+  </extensions>
 </phpunit>
 ```
 

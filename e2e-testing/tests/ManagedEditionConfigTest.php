@@ -12,7 +12,9 @@ declare(strict_types=1);
 
 namespace Contao\E2eTesting\Tests;
 
+use Contao\E2eTesting\Cache\CacheConfig;
 use Contao\E2eTesting\Database\DockerDatabaseConfig;
+use Contao\E2eTesting\Database\DockerDatabaseService;
 use Contao\E2eTesting\Installation\ApplicationPreparer;
 use Contao\E2eTesting\ManagedEdition\ManagedEditionConfig;
 use Contao\InstallationRecipe\Composer\ComposerConfig;
@@ -41,8 +43,24 @@ final class ManagedEditionConfigTest extends TestCase
         $recipe = InstallationRecipe::create(ComposerConfig::managedEdition('^5.7'));
         $database = DockerDatabaseConfig::mysql('mysql:8.0');
         $config = ManagedEditionConfig::create($recipe, \dirname(__DIR__, 2))->withDatabase($database);
+        $service = $config->dockerServices()[0];
 
         $this->assertSame($database, $config->environment->database);
+        $this->assertInstanceOf(DockerDatabaseService::class, $service);
+        $this->assertSame($database, $service->config);
+    }
+
+    public function testDockerServicesForDifferentProjectsHaveDifferentFingerprints(): void
+    {
+        $database = DockerDatabaseConfig::mariaDb();
+        $temporaryDirectory = sys_get_temp_dir();
+        $sharedCache = $temporaryDirectory.'/shared-e2e-cache';
+        $firstCache = CacheConfig::forProject($temporaryDirectory.'/project-a')->withRootDirectory($sharedCache);
+        $secondCache = CacheConfig::forProject($temporaryDirectory.'/project-b')->withRootDirectory($sharedCache);
+        $first = new DockerDatabaseService($firstCache, $database);
+        $second = new DockerDatabaseService($secondCache, $database);
+
+        $this->assertNotSame($first->fingerprint(), $second->fingerprint());
     }
 
     public function testSelectsTheAppEnvironmentWithoutChangingTheOriginalConfig(): void
