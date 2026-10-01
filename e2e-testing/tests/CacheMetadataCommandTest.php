@@ -17,6 +17,7 @@ use Contao\E2eTesting\Command\CacheMetadataCommand;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Console\Tester\CommandTester;
 use Symfony\Component\Filesystem\Filesystem;
+use Symfony\Component\Filesystem\Path;
 
 final class CacheMetadataCommandTest extends TestCase
 {
@@ -24,7 +25,7 @@ final class CacheMetadataCommandTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->directory = \dirname(__DIR__, 2).'/.contao-e2e/runtime/unit-tests/cache-command-'.bin2hex(random_bytes(6));
+        $this->directory = Path::join(\dirname(__DIR__, 2), '.contao-e2e/runtime/unit-tests/cache-command-'.bin2hex(random_bytes(6)));
         $filesystem = new Filesystem();
         $filesystem->mkdir([
             $this->directory.'/package/bin/node_modules/playwright',
