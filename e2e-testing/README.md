@@ -163,10 +163,7 @@ jobs:
             - name: Restore Managed Edition caches
               uses: actions/cache@v4
               with:
-                  path: |
-                      .contao-e2e/cache/composer
-                      .contao-e2e/cache/dependency-locks
-                      .contao-e2e/cache/installations
+                  path: .contao-e2e/cache/managed-edition
                   key: contao-e2e-${{ hashFiles('.contao-e2e/cache-keys/managed-edition') }}
 
             - name: Install and verify Playwright browsers
@@ -176,7 +173,7 @@ jobs:
               run: vendor/bin/phpunit --configuration=phpunit.xml.dist
 ```
 
-The cache root contains only reusable Playwright, Composer, dependency lock, and installation data. Database data, process locks, runtime files, and failure artifacts are deliberately excluded. The existing per-installation dependency and application fingerprints still validate restored installations, so project source files do not need to be part of the outer CI cache key.
+The cache root contains separate `playwright` and `managed-edition` groups. The package owns the contents of each group, so adding another reusable Managed Edition cache does not require consuming projects to update their CI configuration. Database data, process locks, runtime files, and failure artifacts are deliberately excluded. The existing per-installation dependency and application fingerprints still validate restored installations, so project source files do not need to be part of the outer CI cache key.
 
 GitHub Actions restricts cache access by branch and ref. A pull request can restore caches created on its base branch, while caches created for a pull request's merge ref are only available to reruns of that pull request. Run this job on pushes to the default branch as well as pull requests so the default branch regularly creates a cache that different pull requests can reuse.
 
@@ -448,7 +445,7 @@ $this->assertSame(200, $browser->getInternalResponse()->getStatusCode());
 $this->assertSame('Example', trim($crawler->filterXPath('//head/title')->text()));
 ```
 
-Full Managed Editions are stored below `.contao-e2e/cache/installations/<fingerprint>/<slot>/project`. The matching
+Full Managed Editions are stored below `.contao-e2e/cache/managed-edition/installations/<fingerprint>/<slot>/project`. The matching
 MySQL or MariaDB database runs in the configured server or a reusable Docker container. The default database files are stored below `.contao-e2e/database/data`; additional image variants use `.contao-e2e/database/<fingerprint>/data`. The `runtime/` directory only contains
 the lightweight webserver router and origin mapping.
 

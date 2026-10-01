@@ -63,11 +63,15 @@ final class CacheMetadataFactoryTest extends TestCase
         $this->assertSame($this->directory.'/project/.contao-e2e/cache/playwright', $first['playwright']['path']);
         $this->assertSame(
             [
-                'composer' => $this->directory.'/project/.contao-e2e/cache/composer',
-                'dependency_locks' => $this->directory.'/project/.contao-e2e/cache/dependency-locks',
-                'installations' => $this->directory.'/project/.contao-e2e/cache/installations',
+                'composer' => $this->directory.'/project/.contao-e2e/cache/managed-edition/composer',
+                'dependency_locks' => $this->directory.'/project/.contao-e2e/cache/managed-edition/dependency-locks',
+                'installations' => $this->directory.'/project/.contao-e2e/cache/managed-edition/installations',
             ],
             $first['managed_edition']['paths'],
+        );
+        $this->assertSame(
+            $this->directory.'/project/.contao-e2e/cache/managed-edition',
+            $first['managed_edition']['path'],
         );
 
         $this->assertArrayNotHasKey('database', $first['managed_edition']['paths']);

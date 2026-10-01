@@ -34,7 +34,7 @@ final readonly class CacheMetadataFactory
      * @return array{
      *     schema_version: int,
      *     playwright: array{fingerprint: string, path: string, version: string, browsers: array<string, array{revision: string, revision_overrides: array<string, string>}>},
-     *     managed_edition: array{fingerprint: string, paths: array{composer: string, dependency_locks: string, installations: string}}
+     *     managed_edition: array{fingerprint: string, path: string, paths: array{composer: string, dependency_locks: string, installations: string}}
      * }
      */
     public function create(CacheConfig $config): array
@@ -46,6 +46,7 @@ final readonly class CacheMetadataFactory
             'playwright' => $this->playwrightMetadata($config),
             'managed_edition' => [
                 'fingerprint' => $this->fingerprint->calculate($compatibility),
+                'path' => $config->managedEditionCacheDirectory(),
                 'paths' => [
                     'composer' => $config->composerCacheDirectory(),
                     'dependency_locks' => $config->dependencyLocksDirectory(),

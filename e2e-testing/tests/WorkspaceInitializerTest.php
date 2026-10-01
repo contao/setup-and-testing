@@ -29,7 +29,7 @@ final class WorkspaceInitializerTest extends TestCase
 
         $this->assertFileExists($project.'/.contao-e2e/.managed-by-contao-e2e');
         $this->assertSame("*\n!.gitignore\n", file_get_contents($project.'/.contao-e2e/.gitignore'));
-        $this->assertDirectoryExists($project.'/.contao-e2e/cache/installations');
+        $this->assertDirectoryExists($project.'/.contao-e2e/cache/managed-edition/installations');
         $this->assertDirectoryExists($project.'/.contao-e2e/cache/playwright');
         $this->assertDirectoryExists($project.'/.contao-e2e/cache-keys');
         $this->assertDirectoryExists($project.'/.contao-e2e/database');
