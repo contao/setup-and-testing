@@ -18,13 +18,13 @@ use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Style\SymfonyStyle;
 
-#[AsCommand('cache:clear', 'Clear reusable dependency and Managed Edition caches')]
+#[AsCommand('cache:clear', 'Clear reusable E2E setup caches')]
 final class CacheClearCommand extends AbstractWorkspaceCommand
 {
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
         (new WorkspaceCleaner())->clearCache($this->cache());
-        (new SymfonyStyle($input, $output))->success('E2E dependency and installation caches cleared.');
+        (new SymfonyStyle($input, $output))->success('Reusable E2E setup caches cleared.');
 
         return self::SUCCESS;
     }

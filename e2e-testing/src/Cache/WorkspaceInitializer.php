@@ -26,9 +26,11 @@ final readonly class WorkspaceInitializer
     {
         $this->assertSafe($config);
         $this->filesystem->mkdir([
-            Path::join($config->rootDirectory, 'cache/composer'),
-            Path::join($config->rootDirectory, 'cache/dependency-locks'),
-            Path::join($config->rootDirectory, 'cache/installations'),
+            $config->composerCacheDirectory(),
+            $config->dependencyLocksDirectory(),
+            $config->installationsDirectory(),
+            $config->playwrightCacheDirectory(),
+            $config->cacheKeysDirectory(),
             Path::join($config->rootDirectory, 'database'),
             Path::join($config->rootDirectory, 'failures'),
             Path::join($config->rootDirectory, 'locks'),

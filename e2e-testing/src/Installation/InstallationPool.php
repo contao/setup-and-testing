@@ -38,7 +38,7 @@ final readonly class InstallationPool
                 continue;
             }
 
-            $directory = Path::join($cache->rootDirectory, 'cache/installations', $fingerprint, (string) $slot);
+            $directory = Path::join($cache->installationsDirectory(), $fingerprint, (string) $slot);
             $this->filesystem->mkdir($directory);
 
             return new InstallationLease($directory, $slot, $lock);

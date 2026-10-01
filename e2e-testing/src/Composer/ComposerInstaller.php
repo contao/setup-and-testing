@@ -43,7 +43,7 @@ final readonly class ComposerInstaller
             $command,
             $directory,
             [
-                'COMPOSER_CACHE_DIR' => Path::join($config->environment->cache->rootDirectory, 'cache/composer'),
+                'COMPOSER_CACHE_DIR' => $config->environment->cache->composerCacheDirectory(),
             ],
         );
     }

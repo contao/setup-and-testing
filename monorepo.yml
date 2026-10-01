@@ -1,5 +1,5 @@
 monorepo_url: https://github.com/contao/setup-and-testing.git
-branch_filter: /^(main|\d+\.\d+)$/
+branch_filter: /^(main|\d+\.\d+|feature\/.+)$/
 
 composer:
     require: []

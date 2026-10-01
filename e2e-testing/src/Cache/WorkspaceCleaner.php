@@ -25,7 +25,7 @@ final readonly class WorkspaceCleaner
     public function clearCache(CacheConfig $config): void
     {
         $this->assertManaged($config);
-        $this->filesystem->remove(Path::join($config->rootDirectory, 'cache'));
+        $this->filesystem->remove([$config->cacheDirectory(), $config->cacheKeysDirectory()]);
         (new WorkspaceInitializer($this->filesystem))->initialize($config);
     }
 

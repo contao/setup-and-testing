@@ -37,4 +37,39 @@ final readonly class CacheConfig
     {
         return new self($this->projectDirectory, Path::makeAbsolute($rootDirectory, $this->projectDirectory));
     }
+
+    public function cacheDirectory(): string
+    {
+        return Path::join($this->rootDirectory, 'cache');
+    }
+
+    public function e2eCacheDirectory(): string
+    {
+        return Path::join($this->cacheDirectory(), 'e2e');
+    }
+
+    public function composerCacheDirectory(): string
+    {
+        return Path::join($this->e2eCacheDirectory(), 'composer');
+    }
+
+    public function dependencyLocksDirectory(): string
+    {
+        return Path::join($this->e2eCacheDirectory(), 'dependency-locks');
+    }
+
+    public function installationsDirectory(): string
+    {
+        return Path::join($this->e2eCacheDirectory(), 'installations');
+    }
+
+    public function playwrightCacheDirectory(): string
+    {
+        return Path::join($this->cacheDirectory(), 'playwright');
+    }
+
+    public function cacheKeysDirectory(): string
+    {
+        return Path::join($this->rootDirectory, 'cache-keys');
+    }
 }

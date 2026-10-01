@@ -23,6 +23,7 @@ final class E2eApplicationTest extends TestCase
 
         $this->assertTrue($application->has('doctor'));
         $this->assertTrue($application->has('cache:clear'));
+        $this->assertTrue($application->has('cache:metadata'));
         $this->assertTrue($application->has('database:stop'));
         $this->assertTrue($application->has('failures:clear'));
         $this->assertTrue($application->find('database:stop')->getDefinition()->hasOption('force'));
