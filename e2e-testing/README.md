@@ -109,13 +109,13 @@ Use `vendor/bin/playwright-install --with-deps` on a fresh Linux CI runner to in
 
 ## CI caches
 
-`cache:metadata` writes separate portable keys for Playwright browser binaries and Managed Edition dependencies, then prints their metadata as JSON:
+`cache:metadata` writes separate portable keys for Playwright browser binaries and reusable E2E setup data, then prints each opaque fingerprint and cache root as JSON:
 
 ```shell
 vendor/bin/contao-e2e cache:metadata
 ```
 
-The keys are written to `.contao-e2e/cache-keys/playwright` and `.contao-e2e/cache-keys/managed-edition`. Any CI system can use their contents directly or hash the files. They remain separate because browser binaries and Managed Edition dependencies have different invalidation rules.
+The keys are written to `.contao-e2e/cache-keys/playwright` and `.contao-e2e/cache-keys/e2e`. Any CI system can use their contents directly or hash the files. They remain separate because browser binaries and the rest of the E2E setup have different invalidation rules.
 
 The Playwright fingerprint uses the concrete version from the installed Node package and the browser revisions from Playwright's installed browser registry. The Managed Edition fingerprint covers the cache format, PHP major and minor version, operating system, architecture, the installed `contao/e2e-testing` and `contao/installation-recipe` versions, and Composer settings that can affect dependency resolution.
 
@@ -160,11 +160,11 @@ jobs:
                   path: .contao-e2e/cache/playwright
                   key: playwright-${{ hashFiles('.contao-e2e/cache-keys/playwright') }}
 
-            - name: Restore Managed Edition caches
+            - name: Restore E2E setup cache
               uses: actions/cache@v4
               with:
-                  path: .contao-e2e/cache/managed-edition
-                  key: contao-e2e-${{ hashFiles('.contao-e2e/cache-keys/managed-edition') }}
+                  path: .contao-e2e/cache/e2e
+                  key: contao-e2e-${{ hashFiles('.contao-e2e/cache-keys/e2e') }}
 
             - name: Install and verify Playwright browsers
               run: vendor/bin/playwright-install --browsers
@@ -173,7 +173,7 @@ jobs:
               run: vendor/bin/phpunit --configuration=phpunit.xml.dist
 ```
 
-The cache root contains separate `playwright` and `managed-edition` groups. The package owns the contents of each group, so adding another reusable Managed Edition cache does not require consuming projects to update their CI configuration. Database data, process locks, runtime files, and failure artifacts are deliberately excluded. The existing per-installation dependency and application fingerprints still validate restored installations, so project source files do not need to be part of the outer CI cache key.
+The cache root contains separate `playwright` and `e2e` groups. The package owns the contents of each group, so adding another reusable E2E setup cache does not require consuming projects to update their CI configuration. Database data, process locks, runtime files, and failure artifacts are deliberately excluded. The existing per-installation dependency and application fingerprints still validate restored installations, so project source files do not need to be part of the outer CI cache key.
 
 GitHub Actions restricts cache access by branch and ref. A pull request can restore caches created on its base branch, while caches created for a pull request's merge ref are only available to reruns of that pull request. Run this job on pushes to the default branch as well as pull requests so the default branch regularly creates a cache that different pull requests can reuse.
 
@@ -445,7 +445,7 @@ $this->assertSame(200, $browser->getInternalResponse()->getStatusCode());
 $this->assertSame('Example', trim($crawler->filterXPath('//head/title')->text()));
 ```
 
-Full Managed Editions are stored below `.contao-e2e/cache/managed-edition/installations/<fingerprint>/<slot>/project`. The matching
+Full Managed Editions are stored below `.contao-e2e/cache/e2e/installations/<fingerprint>/<slot>/project`. The matching
 MySQL or MariaDB database runs in the configured server or a reusable Docker container. The default database files are stored below `.contao-e2e/database/data`; additional image variants use `.contao-e2e/database/<fingerprint>/data`. The `runtime/` directory only contains
 the lightweight webserver router and origin mapping.
 

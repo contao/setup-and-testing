@@ -59,22 +59,21 @@ final class CacheMetadataCommandTest extends TestCase
         }
 
         $this->assertSame(1, $metadata['schema_version']);
-        $this->assertSame('1.63.0', $metadata['playwright']['version']);
         $this->assertSame(
             $metadata['playwright']['fingerprint']."\n",
             file_get_contents($cacheDirectory.'/cache-keys/playwright'),
         );
         $this->assertSame(
-            $metadata['managed_edition']['fingerprint']."\n",
-            file_get_contents($cacheDirectory.'/cache-keys/managed-edition'),
+            $metadata['e2e']['fingerprint']."\n",
+            file_get_contents($cacheDirectory.'/cache-keys/e2e'),
         );
         $this->assertSame(
-            [
-                'composer',
-                'dependency_locks',
-                'installations',
-            ],
-            array_keys($metadata['managed_edition']['paths']),
+            $cacheDirectory.'/cache/playwright',
+            $metadata['playwright']['path'],
+        );
+        $this->assertSame(
+            $cacheDirectory.'/cache/e2e',
+            $metadata['e2e']['path'],
         );
     }
 

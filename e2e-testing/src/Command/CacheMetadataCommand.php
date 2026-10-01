@@ -41,8 +41,8 @@ final class CacheMetadataCommand extends AbstractWorkspaceCommand
             $metadata['playwright']['fingerprint']."\n",
         );
         $this->filesystem->dumpFile(
-            Path::join($config->cacheKeysDirectory(), 'managed-edition'),
-            $metadata['managed_edition']['fingerprint']."\n",
+            Path::join($config->cacheKeysDirectory(), 'e2e'),
+            $metadata['e2e']['fingerprint']."\n",
         );
         $output->writeln(json_encode(
             $metadata,

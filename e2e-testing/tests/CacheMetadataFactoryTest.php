@@ -58,26 +58,15 @@ final class CacheMetadataFactoryTest extends TestCase
         $second = $factory->create($config);
 
         $this->assertSame($first['playwright']['fingerprint'], $second['playwright']['fingerprint']);
-        $this->assertSame($first['managed_edition']['fingerprint'], $second['managed_edition']['fingerprint']);
-        $this->assertNotSame($first['playwright']['fingerprint'], $first['managed_edition']['fingerprint']);
+        $this->assertSame($first['e2e']['fingerprint'], $second['e2e']['fingerprint']);
+        $this->assertNotSame($first['playwright']['fingerprint'], $first['e2e']['fingerprint']);
         $this->assertSame($this->directory.'/project/.contao-e2e/cache/playwright', $first['playwright']['path']);
         $this->assertSame(
-            [
-                'composer' => $this->directory.'/project/.contao-e2e/cache/managed-edition/composer',
-                'dependency_locks' => $this->directory.'/project/.contao-e2e/cache/managed-edition/dependency-locks',
-                'installations' => $this->directory.'/project/.contao-e2e/cache/managed-edition/installations',
-            ],
-            $first['managed_edition']['paths'],
+            $this->directory.'/project/.contao-e2e/cache/e2e',
+            $first['e2e']['path'],
         );
-        $this->assertSame(
-            $this->directory.'/project/.contao-e2e/cache/managed-edition',
-            $first['managed_edition']['path'],
-        );
-
-        $this->assertArrayNotHasKey('database', $first['managed_edition']['paths']);
-        $this->assertArrayNotHasKey('locks', $first['managed_edition']['paths']);
-        $this->assertArrayNotHasKey('runtime', $first['managed_edition']['paths']);
-        $this->assertArrayNotHasKey('failures', $first['managed_edition']['paths']);
+        $this->assertSame(['fingerprint', 'path'], array_keys($first['playwright']));
+        $this->assertSame(['fingerprint', 'path'], array_keys($first['e2e']));
     }
 
     public function testPlaywrightVersionInvalidatesOnlyTheBrowserFingerprint(): void
@@ -88,7 +77,7 @@ final class CacheMetadataFactoryTest extends TestCase
         $changed = $this->factory()->create($config);
 
         $this->assertNotSame($initial['playwright']['fingerprint'], $changed['playwright']['fingerprint']);
-        $this->assertSame($initial['managed_edition']['fingerprint'], $changed['managed_edition']['fingerprint']);
+        $this->assertSame($initial['e2e']['fingerprint'], $changed['e2e']['fingerprint']);
     }
 
     public function testExplainsHowToPrepareMissingPlaywrightDependencies(): void
@@ -112,7 +101,7 @@ final class CacheMetadataFactoryTest extends TestCase
         $changed = $this->factory($override)->create($config);
 
         $this->assertSame($initial['playwright']['fingerprint'], $changed['playwright']['fingerprint']);
-        $this->assertNotSame($initial['managed_edition']['fingerprint'], $changed['managed_edition']['fingerprint']);
+        $this->assertNotSame($initial['e2e']['fingerprint'], $changed['e2e']['fingerprint']);
     }
 
     /**

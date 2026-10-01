@@ -33,8 +33,8 @@ final readonly class CacheMetadataFactory
     /**
      * @return array{
      *     schema_version: int,
-     *     playwright: array{fingerprint: string, path: string, version: string, browsers: array<string, array{revision: string, revision_overrides: array<string, string>}>},
-     *     managed_edition: array{fingerprint: string, path: string, paths: array{composer: string, dependency_locks: string, installations: string}}
+     *     playwright: array{fingerprint: string, path: string},
+     *     e2e: array{fingerprint: string, path: string}
      * }
      */
     public function create(CacheConfig $config): array
@@ -43,28 +43,18 @@ final readonly class CacheMetadataFactory
 
         return [
             'schema_version' => 1,
-            'playwright' => $this->playwrightMetadata($config),
-            'managed_edition' => [
+            'playwright' => [
+                'fingerprint' => $this->playwrightFingerprint(),
+                'path' => $config->playwrightCacheDirectory(),
+            ],
+            'e2e' => [
                 'fingerprint' => $this->fingerprint->calculate($compatibility),
-                'path' => $config->managedEditionCacheDirectory(),
-                'paths' => [
-                    'composer' => $config->composerCacheDirectory(),
-                    'dependency_locks' => $config->dependencyLocksDirectory(),
-                    'installations' => $config->installationsDirectory(),
-                ],
+                'path' => $config->e2eCacheDirectory(),
             ],
         ];
     }
 
-    /**
-     * @return array{
-     *     fingerprint: string,
-     *     path: string,
-     *     version: string,
-     *     browsers: array<string, array{revision: string, revision_overrides: array<string, string>}>
-     * }
-     */
-    private function playwrightMetadata(CacheConfig $config): array
+    private function playwrightFingerprint(): string
     {
         $playwrightDirectory = realpath(Path::join($this->packageDirectory(), 'bin/node_modules/playwright'));
 
@@ -85,12 +75,7 @@ final readonly class CacheMetadataFactory
             'architecture' => $this->architecture ?? php_uname('m'),
         ];
 
-        return [
-            'fingerprint' => $this->fingerprint->calculate([$version, $browsers, $platform]),
-            'path' => $config->playwrightCacheDirectory(),
-            'version' => $version,
-            'browsers' => $browsers,
-        ];
+        return $this->fingerprint->calculate([$version, $browsers, $platform]);
     }
 
     private function packageDirectory(): string

@@ -45,24 +45,24 @@ final readonly class CacheConfig
         return Path::join($this->rootDirectory, 'cache');
     }
 
-    public function managedEditionCacheDirectory(): string
+    public function e2eCacheDirectory(): string
     {
-        return Path::join($this->cacheDirectory(), 'managed-edition');
+        return Path::join($this->cacheDirectory(), 'e2e');
     }
 
     public function composerCacheDirectory(): string
     {
-        return Path::join($this->managedEditionCacheDirectory(), 'composer');
+        return Path::join($this->e2eCacheDirectory(), 'composer');
     }
 
     public function dependencyLocksDirectory(): string
     {
-        return Path::join($this->managedEditionCacheDirectory(), 'dependency-locks');
+        return Path::join($this->e2eCacheDirectory(), 'dependency-locks');
     }
 
     public function installationsDirectory(): string
     {
-        return Path::join($this->managedEditionCacheDirectory(), 'installations');
+        return Path::join($this->e2eCacheDirectory(), 'installations');
     }
 
     public function playwrightCacheDirectory(): string
