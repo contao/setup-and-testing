@@ -23,24 +23,22 @@ use Symfony\Component\Filesystem\Path;
 #[AsCommand('cache:metadata', 'Write cache keys and print metadata for CI systems')]
 final class CacheMetadataCommand extends AbstractWorkspaceCommand
 {
-    public function __construct(
-        private readonly CacheMetadataFactory $metadataFactory = new CacheMetadataFactory(),
-        private readonly WorkspaceInitializer $workspaceInitializer = new WorkspaceInitializer(),
-        private readonly Filesystem $filesystem = new Filesystem(),
-    ) {
+    public function __construct(private readonly CacheMetadataFactory|null $metadataFactory = null)
+    {
         parent::__construct();
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
         $config = $this->cache();
-        $this->workspaceInitializer->initialize($config);
-        $metadata = $this->metadataFactory->create($config);
-        $this->filesystem->dumpFile(
+        (new WorkspaceInitializer())->initialize($config);
+        $metadata = ($this->metadataFactory ?? new CacheMetadataFactory())->create($config);
+        $filesystem = new Filesystem();
+        $filesystem->dumpFile(
             Path::join($config->cacheKeysDirectory(), 'playwright'),
             $metadata['playwright']['fingerprint']."\n",
         );
-        $this->filesystem->dumpFile(
+        $filesystem->dumpFile(
             Path::join($config->cacheKeysDirectory(), 'e2e'),
             $metadata['e2e']['fingerprint']."\n",
         );
