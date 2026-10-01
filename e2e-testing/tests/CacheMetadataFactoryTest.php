@@ -60,7 +60,7 @@ final class CacheMetadataFactoryTest extends TestCase
         $this->assertSame($first['playwright']['fingerprint'], $second['playwright']['fingerprint']);
         $this->assertSame($first['managed_edition']['fingerprint'], $second['managed_edition']['fingerprint']);
         $this->assertNotSame($first['playwright']['fingerprint'], $first['managed_edition']['fingerprint']);
-        $this->assertSame($this->directory.'/browsers', $first['playwright']['path']);
+        $this->assertSame($this->directory.'/project/.contao-e2e/cache/playwright', $first['playwright']['path']);
         $this->assertSame(
             [
                 'composer' => $this->directory.'/project/.contao-e2e/cache/composer',
@@ -95,22 +95,6 @@ final class CacheMetadataFactoryTest extends TestCase
         (new CacheMetadataFactory(playwrightPackageDirectory: $this->directory.'/missing-package'))
             ->create(CacheConfig::forProject($this->directory.'/project'))
         ;
-    }
-
-    public function testUsesConfiguredPlaywrightBrowserDirectory(): void
-    {
-        putenv('PLAYWRIGHT_BROWSERS_PATH=relative-browser-cache');
-        putenv('INIT_CWD='.$this->directory);
-
-        try {
-            $metadata = (new CacheMetadataFactory(playwrightPackageDirectory: $this->directory.'/package'))
-                ->create(CacheConfig::forProject($this->directory.'/project'))
-            ;
-            $this->assertSame($this->directory.'/relative-browser-cache', $metadata['playwright']['path']);
-        } finally {
-            putenv('PLAYWRIGHT_BROWSERS_PATH');
-            putenv('INIT_CWD');
-        }
     }
 
     /**
@@ -148,7 +132,6 @@ final class CacheMetadataFactoryTest extends TestCase
     {
         return new CacheMetadataFactory(
             playwrightPackageDirectory: $this->directory.'/package',
-            browserDirectory: $this->directory.'/browsers',
             compatibilityOverrides: $compatibility,
             operatingSystem: 'Linux',
             architecture: 'x86_64',

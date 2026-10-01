@@ -16,7 +16,7 @@ The dependency goes from `contao/e2e-testing` to `contao/installation-recipe`. T
 | Setting | Purpose |
 | --- | --- |
 | `monorepo_url` | The Git remote for this source repository. |
-| `branch_filter` | The default branches eligible for splitting: `main` and numeric release branches such as `1.0`. |
+| `branch_filter` | The branches eligible for splitting: `main`, numeric release branches such as `1.0`, and `feature/*`. |
 | `repositories` | Maps each package directory to its split repository: [`e2e-testing`](https://github.com/contao/e2e-testing) and [`installation-recipe`](https://github.com/contao/installation-recipe). |
 | `composer` | Extra settings for the combined root `composer.json`. Here, `bamarni/composer-bin-plugin` is a root development dependency. The empty `require` and `conflict` lists add no constraints. |
 

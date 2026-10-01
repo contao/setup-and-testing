@@ -109,13 +109,15 @@ Use `vendor/bin/playwright-install --with-deps` on a fresh Linux CI runner to in
 
 ## CI caches
 
-`cache:metadata` exposes separate cache fingerprints and paths for Playwright browser binaries and Managed Edition dependencies:
+`cache:metadata` writes separate portable keys for Playwright browser binaries and Managed Edition dependencies, then prints their metadata as JSON:
 
 ```shell
 vendor/bin/contao-e2e cache:metadata
 ```
 
-The command prints stable JSON containing `playwright` and `managed_edition` objects. The Playwright fingerprint uses the concrete version from the installed Node package and the browser revisions from Playwright's installed browser registry. The Managed Edition fingerprint covers the cache format, PHP major and minor version, operating system, architecture, the installed `contao/e2e-testing` and `contao/installation-recipe` versions, and Composer settings that can affect dependency resolution.
+The keys are written to `.contao-e2e/cache-keys/playwright` and `.contao-e2e/cache-keys/managed-edition`. Any CI system can use their contents directly or hash the files. They remain separate because browser binaries and Managed Edition dependencies have different invalidation rules.
+
+The Playwright fingerprint uses the concrete version from the installed Node package and the browser revisions from Playwright's installed browser registry. The Managed Edition fingerprint covers the cache format, PHP major and minor version, operating system, architecture, the installed `contao/e2e-testing` and `contao/installation-recipe` versions, and Composer settings that can affect dependency resolution.
 
 The Playwright PHP package resolves the semver constraint in its bundled `package.json` through npm, pnpm, or Yarn. Its resolved Node package and browser registry must therefore exist before metadata can be calculated. Prepare those dependencies explicitly after Composer installation:
 
@@ -124,20 +126,16 @@ vendor/bin/playwright-install
 vendor/bin/contao-e2e cache:metadata
 ```
 
-The first command may access the network to install Node packages. It does not install browser binaries without `--browsers`. `cache:metadata` only reads installed metadata and never performs this preparation itself.
+The first command may access the network to install Node packages. It does not install browser binaries without `--browsers`. `cache:metadata` never performs this preparation or accesses the network itself.
 
-Pass `--github-output` to also write cache keys and paths to the file in `GITHUB_OUTPUT`. JSON remains on standard output and has no GitHub Actions-specific encoding. Multiline paths use GitHub Actions' delimiter format:
-
-```shell
-vendor/bin/contao-e2e cache:metadata --github-output
-```
-
-A complete GitHub Actions job can restore both caches independently:
+A complete GitHub Actions job can keep every cache payload under `.contao-e2e/cache` and restore both groups independently:
 
 ```yaml
 jobs:
     e2e:
         runs-on: ubuntu-latest
+        env:
+            PLAYWRIGHT_BROWSERS_PATH: .contao-e2e/cache/playwright
         steps:
             - uses: actions/checkout@v6
 
@@ -154,20 +152,22 @@ jobs:
               run: vendor/bin/playwright-install
 
             - name: Calculate E2E cache metadata
-              id: e2e-cache
-              run: vendor/bin/contao-e2e cache:metadata --github-output
+              run: vendor/bin/contao-e2e cache:metadata
 
             - name: Restore Playwright browsers
               uses: actions/cache@v4
               with:
-                  path: ${{ steps.e2e-cache.outputs.playwright_path }}
-                  key: playwright-${{ steps.e2e-cache.outputs.playwright_fingerprint }}
+                  path: .contao-e2e/cache/playwright
+                  key: playwright-${{ hashFiles('.contao-e2e/cache-keys/playwright') }}
 
             - name: Restore Managed Edition caches
               uses: actions/cache@v4
               with:
-                  path: ${{ steps.e2e-cache.outputs.managed_edition_paths }}
-                  key: contao-e2e-${{ steps.e2e-cache.outputs.managed_edition_fingerprint }}
+                  path: |
+                      .contao-e2e/cache/composer
+                      .contao-e2e/cache/dependency-locks
+                      .contao-e2e/cache/installations
+                  key: contao-e2e-${{ hashFiles('.contao-e2e/cache-keys/managed-edition') }}
 
             - name: Install and verify Playwright browsers
               run: vendor/bin/playwright-install --browsers
@@ -176,7 +176,7 @@ jobs:
               run: vendor/bin/phpunit --configuration=phpunit.xml.dist
 ```
 
-The Managed Edition paths contain only `.contao-e2e/cache/composer`, `.contao-e2e/cache/dependency-locks`, and `.contao-e2e/cache/installations`. Database data, process locks, runtime files, and failure artifacts are deliberately excluded. The existing per-installation dependency and application fingerprints still validate restored installations, so project source files do not need to be part of the outer Actions cache key.
+The cache root contains only reusable Playwright, Composer, dependency lock, and installation data. Database data, process locks, runtime files, and failure artifacts are deliberately excluded. The existing per-installation dependency and application fingerprints still validate restored installations, so project source files do not need to be part of the outer CI cache key.
 
 GitHub Actions restricts cache access by branch and ref. A pull request can restore caches created on its base branch, while caches created for a pull request's merge ref are only available to reruns of that pull request. Run this job on pushes to the default branch as well as pull requests so the default branch regularly creates a cache that different pull requests can reuse.
 

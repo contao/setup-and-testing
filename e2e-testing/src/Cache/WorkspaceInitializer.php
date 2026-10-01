@@ -29,6 +29,8 @@ final readonly class WorkspaceInitializer
             $config->composerCacheDirectory(),
             $config->dependencyLocksDirectory(),
             $config->installationsDirectory(),
+            $config->playwrightCacheDirectory(),
+            $config->cacheKeysDirectory(),
             Path::join($config->rootDirectory, 'database'),
             Path::join($config->rootDirectory, 'failures'),
             Path::join($config->rootDirectory, 'locks'),

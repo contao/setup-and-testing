@@ -23,7 +23,6 @@ final readonly class CacheMetadataFactory
      */
     public function __construct(
         private string|null $playwrightPackageDirectory = null,
-        private string|null $browserDirectory = null,
         private array $compatibilityOverrides = [],
         private string|null $operatingSystem = null,
         private string|null $architecture = null,
@@ -44,7 +43,7 @@ final readonly class CacheMetadataFactory
 
         return [
             'schema_version' => 1,
-            'playwright' => $this->playwrightMetadata(),
+            'playwright' => $this->playwrightMetadata($config),
             'managed_edition' => [
                 'fingerprint' => $this->fingerprint->calculate($compatibility),
                 'paths' => [
@@ -64,7 +63,7 @@ final readonly class CacheMetadataFactory
      *     browsers: array<string, array{revision: string, revision_overrides: array<string, string>}>
      * }
      */
-    private function playwrightMetadata(): array
+    private function playwrightMetadata(CacheConfig $config): array
     {
         $playwrightDirectory = realpath(Path::join($this->packageDirectory(), 'bin/node_modules/playwright'));
 
@@ -87,7 +86,7 @@ final readonly class CacheMetadataFactory
 
         return [
             'fingerprint' => $this->fingerprint->calculate([$version, $browsers, $platform]),
-            'path' => $this->browserDirectory ?? $this->resolveBrowserDirectory($coreDirectory),
+            'path' => $config->playwrightCacheDirectory(),
             'version' => $version,
             'browsers' => $browsers,
         ];
@@ -187,51 +186,6 @@ final readonly class CacheMetadataFactory
         }
 
         return json_decode($contents, true, flags: JSON_THROW_ON_ERROR);
-    }
-
-    private function resolveBrowserDirectory(string $coreDirectory): string
-    {
-        $configured = getenv('PLAYWRIGHT_BROWSERS_PATH');
-
-        if ('0' === $configured) {
-            return Path::join($coreDirectory, '.local-browsers');
-        }
-
-        if (false !== $configured && '' !== $configured) {
-            $workingDirectory = getenv('INIT_CWD') ?: (string) getcwd();
-
-            return Path::makeAbsolute($configured, $workingDirectory);
-        }
-
-        return Path::join($this->defaultCacheDirectory(), 'ms-playwright');
-    }
-
-    private function defaultCacheDirectory(): string
-    {
-        if ('Windows' === ($this->operatingSystem ?? PHP_OS_FAMILY)) {
-            return $this->environmentDirectory('LOCALAPPDATA')
-                ?? Path::join($this->homeDirectory(), 'AppData/Local');
-        }
-
-        if ('Darwin' === ($this->operatingSystem ?? PHP_OS_FAMILY)) {
-            return Path::join($this->homeDirectory(), 'Library/Caches');
-        }
-
-        return $this->environmentDirectory('XDG_CACHE_HOME') ?? Path::join($this->homeDirectory(), '.cache');
-    }
-
-    private function homeDirectory(): string
-    {
-        return $this->environmentDirectory('HOME')
-            ?? $this->environmentDirectory('USERPROFILE')
-            ?? throw new E2eTestException('Could not determine the Playwright browser cache directory.');
-    }
-
-    private function environmentDirectory(string $name): string|null
-    {
-        $value = getenv($name);
-
-        return false === $value || '' === $value ? null : $value;
     }
 
     /**
