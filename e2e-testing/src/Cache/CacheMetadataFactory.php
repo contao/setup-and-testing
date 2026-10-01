@@ -26,7 +26,6 @@ final readonly class CacheMetadataFactory
         private array $compatibilityOverrides = [],
         private string|null $operatingSystem = null,
         private string|null $architecture = null,
-        private ValueFingerprint $fingerprint = new ValueFingerprint(),
     ) {
     }
 
@@ -48,7 +47,7 @@ final readonly class CacheMetadataFactory
                 'path' => $config->playwrightCacheDirectory(),
             ],
             'e2e' => [
-                'fingerprint' => $this->fingerprint->calculate($compatibility),
+                'fingerprint' => $this->hash($compatibility),
                 'path' => $config->e2eCacheDirectory(),
             ],
         ];
@@ -75,7 +74,7 @@ final readonly class CacheMetadataFactory
             'architecture' => $this->architecture ?? php_uname('m'),
         ];
 
-        return $this->fingerprint->calculate([$version, $browsers, $platform]);
+        return $this->hash([$version, $browsers, $platform]);
     }
 
     private function packageDirectory(): string
@@ -180,7 +179,6 @@ final readonly class CacheMetadataFactory
     private function compatibility(): array
     {
         return [
-            'cache_format' => CacheConfig::FORMAT_VERSION,
             'php' => PHP_MAJOR_VERSION.'.'.PHP_MINOR_VERSION,
             'operating_system' => $this->operatingSystem ?? PHP_OS_FAMILY,
             'architecture' => $this->architecture ?? php_uname('m'),
@@ -206,15 +204,11 @@ final readonly class CacheMetadataFactory
     }
 
     /**
-     * @return array<string, bool|string|null>
+     * @return array<string, string|null>
      */
     private function composerConfiguration(): array
     {
-        $configuration = [
-            'executable' => 'composer',
-            'prefer_lowest' => false,
-            'prefer_stable' => true,
-        ];
+        $configuration = [];
 
         foreach ([
             'COMPOSER_IGNORE_PLATFORM_REQ',
@@ -231,5 +225,10 @@ final readonly class CacheMetadataFactory
         }
 
         return $configuration;
+    }
+
+    private function hash(mixed $value): string
+    {
+        return hash('sha256', serialize($value));
     }
 }

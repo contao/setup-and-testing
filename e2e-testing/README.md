@@ -117,7 +117,7 @@ vendor/bin/contao-e2e cache:metadata
 
 The keys are written to `.contao-e2e/cache-keys/playwright` and `.contao-e2e/cache-keys/e2e`. Any CI system can use their contents directly or hash the files. They remain separate because browser binaries and the rest of the E2E setup have different invalidation rules.
 
-The Playwright fingerprint uses the concrete version from the installed Node package and the browser revisions from Playwright's installed browser registry. The Managed Edition fingerprint covers the cache format, PHP major and minor version, operating system, architecture, the installed `contao/e2e-testing` and `contao/installation-recipe` versions, and Composer settings that can affect dependency resolution.
+The Playwright fingerprint uses the concrete version from the installed Node package and the browser revisions from Playwright's installed browser registry. The E2E fingerprint covers the PHP major and minor version, operating system, architecture, the installed `contao/e2e-testing` and `contao/installation-recipe` versions, and Composer settings that can affect dependency resolution.
 
 The Playwright PHP package resolves the semver constraint in its bundled `package.json` through npm, pnpm, or Yarn. Its resolved Node package and browser registry must therefore exist before metadata can be calculated. Prepare those dependencies explicitly after Composer installation:
 

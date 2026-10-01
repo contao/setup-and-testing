@@ -16,8 +16,6 @@ use Symfony\Component\Filesystem\Path;
 
 final readonly class CacheConfig
 {
-    public const FORMAT_VERSION = 1;
-
     private function __construct(
         public string $projectDirectory,
         public string $rootDirectory,

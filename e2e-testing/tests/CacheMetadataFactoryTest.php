@@ -69,15 +69,24 @@ final class CacheMetadataFactoryTest extends TestCase
         $this->assertSame(['fingerprint', 'path'], array_keys($first['e2e']));
     }
 
-    public function testPlaywrightVersionInvalidatesOnlyTheBrowserFingerprint(): void
+    public function testPlaywrightMetadataInvalidatesOnlyTheBrowserFingerprint(): void
     {
         $config = CacheConfig::forProject($this->directory.'/project');
         $initial = $this->factory()->create($config);
         $this->writePlaywrightVersion('1.64.0');
-        $changed = $this->factory()->create($config);
+        $versionChanged = $this->factory()->create($config);
 
-        $this->assertNotSame($initial['playwright']['fingerprint'], $changed['playwright']['fingerprint']);
-        $this->assertSame($initial['e2e']['fingerprint'], $changed['e2e']['fingerprint']);
+        $this->assertNotSame($initial['playwright']['fingerprint'], $versionChanged['playwright']['fingerprint']);
+        $this->assertSame($initial['e2e']['fingerprint'], $versionChanged['e2e']['fingerprint']);
+
+        (new Filesystem())->dumpFile(
+            $this->directory.'/package/bin/node_modules/playwright-core/browsers.json',
+            '{"browsers":[{"name":"firefox","revision":"1544","installByDefault":true}]}',
+        );
+        $revisionChanged = $this->factory()->create($config);
+
+        $this->assertNotSame($versionChanged['playwright']['fingerprint'], $revisionChanged['playwright']['fingerprint']);
+        $this->assertSame($versionChanged['e2e']['fingerprint'], $revisionChanged['e2e']['fingerprint']);
     }
 
     public function testExplainsHowToPrepareMissingPlaywrightDependencies(): void
@@ -93,8 +102,8 @@ final class CacheMetadataFactoryTest extends TestCase
     /**
      * @param array<string, mixed> $override
      */
-    #[DataProvider('managedEditionCompatibilityProvider')]
-    public function testRelevantCompatibilityChangesInvalidateOnlyTheManagedEditionFingerprint(array $override): void
+    #[DataProvider('e2eCompatibilityProvider')]
+    public function testRelevantCompatibilityChangesInvalidateOnlyTheE2eFingerprint(array $override): void
     {
         $config = CacheConfig::forProject($this->directory.'/project');
         $initial = $this->factory()->create($config);
@@ -107,15 +116,14 @@ final class CacheMetadataFactoryTest extends TestCase
     /**
      * @return iterable<string, array{array<string, mixed>}>
      */
-    public static function managedEditionCompatibilityProvider(): iterable
+    public static function e2eCompatibilityProvider(): iterable
     {
-        yield 'cache format' => [['cache_format' => 2]];
         yield 'PHP version' => [['php' => '9.0']];
         yield 'operating system' => [['operating_system' => 'ExampleOS']];
         yield 'architecture' => [['architecture' => 'example-architecture']];
         yield 'E2E package' => [['packages' => ['contao/e2e-testing' => '2.0.0.0']]];
         yield 'recipe package' => [['packages' => ['contao/installation-recipe' => '2.0.0.0']]];
-        yield 'Composer configuration' => [['composer' => ['prefer_lowest' => true]]];
+        yield 'Composer configuration' => [['composer' => ['COMPOSER_PREFER_LOWEST' => '1']]];
     }
 
     /**
