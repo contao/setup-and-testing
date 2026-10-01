@@ -26,6 +26,7 @@ final readonly class CacheMetadataFactory
         private array $compatibilityOverrides = [],
         private string|null $operatingSystem = null,
         private string|null $architecture = null,
+        private string|null $operatingSystemVersion = null,
     ) {
     }
 
@@ -71,10 +72,24 @@ final readonly class CacheMetadataFactory
         $browsers = $this->readBrowsers(Path::join($coreDirectory, 'browsers.json'));
         $platform = [
             'operating_system' => $this->operatingSystem ?? PHP_OS_FAMILY,
+            'operating_system_version' => $this->operatingSystemVersion ?? $this->operatingSystemVersion(),
             'architecture' => $this->architecture ?? php_uname('m'),
         ];
 
         return $this->hash([$version, $browsers, $platform]);
+    }
+
+    private function operatingSystemVersion(): string
+    {
+        if ('Linux' === PHP_OS_FAMILY && is_readable('/etc/os-release')) {
+            $release = parse_ini_file('/etc/os-release', scanner_mode: INI_SCANNER_RAW);
+
+            if (false !== $release && isset($release['ID'], $release['VERSION_ID'])) {
+                return $release['ID'].'-'.$release['VERSION_ID'];
+            }
+        }
+
+        return php_uname('r');
     }
 
     private function packageDirectory(): string

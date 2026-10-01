@@ -99,6 +99,19 @@ final class CacheMetadataFactoryTest extends TestCase
         ;
     }
 
+    public function testOperatingSystemVersionInvalidatesOnlyTheBrowserFingerprint(): void
+    {
+        $config = CacheConfig::forProject($this->directory.'/project');
+        $initial = $this->factory(operatingSystemVersion: 'ubuntu-22.04')->create($config);
+        $changed = $this->factory(operatingSystemVersion: 'ubuntu-24.04')->create($config);
+        $differentDistribution = $this->factory(operatingSystemVersion: 'debian-12')->create($config);
+
+        $this->assertNotSame($initial['playwright']['fingerprint'], $changed['playwright']['fingerprint']);
+        $this->assertNotSame($changed['playwright']['fingerprint'], $differentDistribution['playwright']['fingerprint']);
+        $this->assertSame($initial['e2e']['fingerprint'], $changed['e2e']['fingerprint']);
+        $this->assertSame($changed['e2e']['fingerprint'], $differentDistribution['e2e']['fingerprint']);
+    }
+
     /**
      * @param array<string, mixed> $override
      */
@@ -129,13 +142,14 @@ final class CacheMetadataFactoryTest extends TestCase
     /**
      * @param array<string, mixed> $compatibility
      */
-    private function factory(array $compatibility = []): CacheMetadataFactory
+    private function factory(array $compatibility = [], string $operatingSystemVersion = 'ubuntu-24.04'): CacheMetadataFactory
     {
         return new CacheMetadataFactory(
             playwrightPackageDirectory: $this->directory.'/package',
             compatibilityOverrides: $compatibility,
             operatingSystem: 'Linux',
             architecture: 'x86_64',
+            operatingSystemVersion: $operatingSystemVersion,
         );
     }
 
