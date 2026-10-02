@@ -4,6 +4,8 @@ ignore: |
     /.contao-e2e/
     /vendor/
     /vendor-bin/
+    /.venv-docs/
+    /site/
 
 rules:
     braces:

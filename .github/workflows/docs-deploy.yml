@@ -1,0 +1,60 @@
+name: Deploy documentation
+
+on:
+    push:
+        branches:
+            - main
+
+permissions:
+    contents: read
+
+concurrency:
+    group: github-pages
+    cancel-in-progress: false
+
+jobs:
+    build:
+        name: Build documentation
+        permissions:
+            contents: read
+            pages: read
+        if: github.ref == 'refs/heads/main'
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v6
+              with:
+                  persist-credentials: false
+
+            - uses: actions/setup-python@v7
+              with:
+                  python-version: '3.12'
+                  cache: pip
+                  cache-dependency-path: requirements-docs.txt
+
+            - name: Install documentation dependencies
+              run: python -m pip install -r requirements-docs.txt
+
+            - uses: actions/configure-pages@v6
+
+            - name: Build documentation
+              run: python -m mkdocs build --strict
+
+            - uses: actions/upload-pages-artifact@v5
+              with:
+                  path: site
+
+    deploy:
+        name: Deploy to GitHub Pages
+        needs: build
+        if: github.ref == 'refs/heads/main'
+        runs-on: ubuntu-latest
+        permissions:
+            pages: write
+            id-token: write
+        environment:
+            name: github-pages
+            url: ${{ steps.deployment.outputs.page_url }}
+        steps:
+            - name: Deploy documentation
+              id: deployment
+              uses: actions/deploy-pages@v5

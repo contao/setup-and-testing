@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+
+{% block site_name %}
+<a class="navbar-brand docs-brand" href="{{ nav.homepage.url|url }}">
+    <img src="{{ 'assets/contao-logo.svg'|url }}" width="148" height="40" alt="Contao">
+    <span>Recipes &amp; testing tools</span>
+</a>
+{% endblock %}
+
+{% block site_nav %}{% endblock %}
+{% block next_prev %}{% endblock %}
+
+{% block repo %}
+<li class="nav-item">
+    <a href="{{ config.repo_url }}" class="nav-link"><i class="fa-brands fa-github" aria-hidden="true"></i> GitHub</a>
+</li>
+{% endblock %}
+
+{% block content %}
+<aside class="docs-sidebar">
+    <button class="docs-browse-button d-lg-none" type="button" data-bs-toggle="collapse" data-bs-target="#documentation-navigation" aria-expanded="false" aria-controls="documentation-navigation">
+        Browse documentation <span aria-hidden="true">⌄</span>
+    </button>
+    <nav id="documentation-navigation" class="collapse d-lg-block" aria-label="Documentation">
+        {% for item in nav %}
+            {% if item.children %}
+                <details class="docs-nav-group"{% if item.active or (page and page.is_homepage and item.title in ['Guides', 'Recipes']) %} open{% endif %}>
+                    <summary>{{ item.title }}</summary>
+                    <ul>
+                        {% for child in item.children %}
+                            <li><a href="{{ child.url|url }}"{% if child.active %} class="active" aria-current="page"{% endif %}>{{ child.title }}</a></li>
+                        {% endfor %}
+                    </ul>
+                </details>
+            {% else %}
+                <a class="docs-nav-single{% if item.active %} active{% endif %}" href="{{ item.url|url }}"{% if item.active %} aria-current="page"{% endif %}>{{ item.title }}</a>
+            {% endif %}
+        {% endfor %}
+    </nav>
+</aside>
+<main class="docs-article" id="main-content">
+    {% if page and not page.is_homepage %}<div class="docs-eyebrow">{{ page.parent.title if page.parent else 'Documentation' }}</div>{% endif %}
+    {% include "content.html" %}
+    {% if page and page.edit_url %}<a class="docs-edit" href="{{ page.edit_url }}">Improve this page <span aria-hidden="true">↗</span></a>{% endif %}
+</main>
+<aside class="docs-page-contents" aria-label="On this page">
+    {% if page and page.toc %}
+    <div class="docs-eyebrow">On this page</div>
+    <ul>
+        {% for item in page.toc %}
+            {% for section in item.children %}
+                <li><a href="{{ section.url }}">{{ section.title }}</a></li>
+            {% endfor %}
+        {% endfor %}
+    </ul>
+    {% endif %}
+</aside>
+{% endblock %}
+
+{% block footer %}
+<div class="docs-footer">
+    <span>{{ config.site_name }}</span>
+    <span>Documentation for main · Built with <a href="https://www.mkdocs.org/">MkDocs</a></span>
+</div>
+{% endblock %}

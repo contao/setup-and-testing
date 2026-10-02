@@ -5,3 +5,7 @@
 /.contao-e2e/
 /vendor/
 /vendor-bin/*/vendor/
+
+# Documentation
+/.venv-docs/
+/site/
