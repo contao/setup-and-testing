@@ -5,7 +5,7 @@ This monorepo develops two packages on a shared version line that is independent
 | Package | Responsibility | Use it for |
 | --- | --- | --- |
 | [`contao/installation-recipe`](installation-recipe/) | Defines and applies portable recipes containing Composer requirements, configuration, database fixtures, and project files. The host application supplies operations such as dependency installation and migration. | Building an installer or importer that consumes recipes. |
-| [`contao/e2e-testing`](e2e-testing/) | Consumes those recipes to provision isolated Contao Managed Editions for tests, with a database, installation cache, web server, and HTTP and browser clients. | Testing a Contao project through HTTP requests or a real browser from PHPUnit. |
+| [`contao/e2e-testing`](e2e-testing/) | Provides browser testing for existing web applications and consumes recipes to provision isolated Contao Managed Editions with a database, installation cache, web server, and HTTP clients. | Testing Contao extensions, complete Contao projects, or other web applications from PHPUnit. |
 
 The dependency goes from `contao/e2e-testing` to `contao/installation-recipe`. They live together so changes to the recipe model and its test consumer can be tested atomically. Both packages are released independently of `contao/contao`, and the consuming project selects the Contao version to test.
 

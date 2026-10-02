@@ -19,7 +19,7 @@ use Playwright\Exception\PlaywrightExceptionInterface;
 use Playwright\PlaywrightClient;
 use Playwright\PlaywrightFactory;
 
-final class PlaywrightManager
+final class PlaywrightManager implements BrowserSessionFactoryInterface
 {
     private PlaywrightClient|null $playwright = null;
 

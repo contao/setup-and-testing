@@ -21,6 +21,6 @@ abstract class AbstractManagedEditionTestCase extends TestCase implements Docker
 
     public static function dockerServices(): iterable
     {
-        return static::createManagedEditionConfig()->dockerServices();
+        return static::createApplicationConfig()->dockerServices();
     }
 }
