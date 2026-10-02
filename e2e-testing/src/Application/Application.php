@@ -17,6 +17,7 @@ use Contao\E2eTesting\Browser\BrowserOptions;
 use Contao\E2eTesting\Browser\BrowserRuntime;
 use Contao\E2eTesting\Browser\BrowserSession;
 use Contao\E2eTesting\Browser\BrowserType;
+use Contao\E2eTesting\Http\WebServerProcess;
 
 final class Application implements ApplicationInterface
 {
@@ -25,6 +26,7 @@ final class Application implements ApplicationInterface
     public function __construct(
         private readonly ApplicationConfig $config,
         BrowserRuntime|null $browserRuntime = null,
+        private readonly WebServerProcess|null $server = null,
     ) {
         $this->browserRuntime = $browserRuntime ?? new BrowserRuntime($config->traceDirectory());
     }
@@ -51,6 +53,10 @@ final class Application implements ApplicationInterface
 
     public function release(): void
     {
-        $this->browserRuntime->close();
+        try {
+            $this->browserRuntime->close();
+        } finally {
+            $this->server?->stop();
+        }
     }
 }

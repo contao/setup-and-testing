@@ -32,9 +32,9 @@ Test a running Contao project with frontend assertions and backend helpers.
 
 <div class="use-case-card" markdown="1">
 
-### [Test an existing web application](guides/web-application.md)
+### [Test a web application](guides/web-application.md)
 
-Test a running application in a single repository or monorepo, whatever its framework or language.
+Test an application in a single repository or monorepo, using a local server or an existing URL.
 
 </div>
 
@@ -58,15 +58,16 @@ Integrate a recipe archive into an installer and apply it to a prepared project.
 
 ## Who runs the application?
 
-There are two testing modes. The Contao project and general web application guides use the same URL-based mode.
+Choose whether the tooling should build an isolated Contao installation or test your own application. The Contao project and general web application guides use the same application testing tools.
 
-| Responsibility | Managed Edition | Existing application |
+| Responsibility | Managed Edition | Your application |
 | --- | --- | --- |
-| Use it for | A Contao extension or several local Contao packages | A complete application already served at a URL |
-| Installation and web server | Created and started by the tooling | Provided by your project or test environment |
+| Use it for | A Contao extension or several local Contao packages | A complete application, local or already served at a URL |
+| Installation | Created by the tooling | Prepared by your project |
+| Web server | Started by the tooling | Started by the tooling when configured, or provided through a URL |
 | Database setup and resets | Managed by the tooling using your recipe | Handled by your project's test setup |
 | Browser sessions and assertions | Managed by the tooling | Managed by the tooling |
 
-A **Managed Edition** is an isolated Contao installation built from a recipe for your tests. An **existing application** is any application you connect to through its URL, including Contao. Contao backend helpers work in both modes.
+A **Managed Edition** is an isolated Contao installation built from a recipe for your tests. For **your application**, use a local server configuration or an existing URL, including for Contao projects. Contao backend helpers work in both modes.
 
 Recipes can also be created and applied independently of testing. These docs follow `main`. Check the [requirements](reference/requirements.md) for supported versions.

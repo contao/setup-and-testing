@@ -84,10 +84,10 @@ GitHub Actions restricts cache access by branch and ref. A pull request can rest
 
 Use the same PHP, Node.js and Playwright installation steps. Restore the Playwright cache if desired, and omit the Managed Edition setup cache.
 
-Before PHPUnit runs:
+Install and build your application and prepare its test data before PHPUnit runs.
 
-1. Prepare your application's test data.
-2. Start the application using your project's usual command if it is not already available.
-3. Wait until its test URL responds, then set `E2E_BASE_URL` to that URL.
+With `LocalApplicationConfig`, PHPUnit starts and stops the server itself. Install the runtime used by its configured command on the runner.
+
+With `ApplicationConfig`, start the application if needed, wait for its URL to respond and set `E2E_BASE_URL` to that URL.
 
 A remote test environment may already have its own server. A local Docker service must be reachable from the runner. Arrange server-side resets between tests that modify data, as explained in [the application guide](../guides/web-application.md#keep-tests-independent).

@@ -2,7 +2,7 @@
 
 Use this guide when several Composer packages live in one repository and should be tested together in an isolated Contao installation. The root installs the test tooling, while `MonorepoProject` adds selected local packages to the Managed Edition.
 
-For a monorepo containing another kind of web application, follow [Test an existing web application](web-application.md#use-this-in-a-monorepo). Your repository layout does not require a Managed Edition.
+For a monorepo containing another kind of web application, follow [Test a web application](web-application.md#use-this-in-a-monorepo). Your repository layout does not require a Managed Edition.
 
 ## Prerequisites and layout
 

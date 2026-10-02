@@ -1,14 +1,14 @@
-# Test an existing web application
+# Test a web application
 
 Test an application through its URL, whether it is a Contao project or uses another framework or language. The tooling runs real browsers and provides PHPUnit assertions.
 
-Your application must be reachable before you run the tests. It can use your normal development server, a Docker service or a remote test environment. You only start a server if one is not already running. Supplying a URL does not launch or configure the application.
+Choose how to serve the application: connect to a server already running at a URL, or let the tests start and stop a local server. The tooling can serve a PHP project directly or run your application's own startup command. Your project still prepares dependencies, builds and test data.
 
 For Contao backend tests, add [the Contao-specific checks](contao-project.md) after completing this guide.
 
 ## Prepare your application
 
-Use a test environment whose homepage contains an `h1`. Check that you can open it in a browser. The examples use `http://localhost:8080`, so replace that address with your application's URL.
+Use a test environment whose homepage contains an `h1`. Install and build the application using your project's normal commands. For a server that is already running, check that you can open its URL in a browser. The URL-based example uses `http://localhost:8080`, so replace that address with yours.
 
 Install the [supported PHP, Composer and Node.js versions](../reference/requirements.md) on the machine that runs PHPUnit. PHP is needed for the tests even if the application uses another language. Docker and MySQL are needed only if your application uses them.
 
@@ -34,10 +34,11 @@ declare(strict_types=1);
 
 use Contao\E2eTesting\Application\AbstractApplicationTestCase;
 use Contao\E2eTesting\Application\ApplicationConfig;
+use Contao\E2eTesting\Application\ApplicationConfigInterface;
 
 final class HomepageTest extends AbstractApplicationTestCase
 {
-    protected static function createApplicationConfig(): ApplicationConfig
+    protected static function createApplicationConfig(): ApplicationConfigInterface
     {
         return ApplicationConfig::create(getenv('E2E_BASE_URL') ?: 'http://localhost:8080');
     }
@@ -49,6 +50,26 @@ final class HomepageTest extends AbstractApplicationTestCase
     }
 }
 ```
+
+### Start a local server instead
+
+For a PHP project with a `public/` document root, add this import at the top of the test file:
+
+```php
+use Contao\E2eTesting\Application\LocalApplicationConfig;
+```
+
+Replace the return statement in `createApplicationConfig()` with:
+
+```php
+return LocalApplicationConfig::php(dirname(__DIR__, 2));
+```
+
+This example assumes the tests are inside the application repository. If you keep tests in a separate repository or serve an application below the monorepo root, pass that application's directory instead.
+
+The tests now start PHP's built-in server on a free loopback port and stop it after the test class. You do not need to start a server manually or set `E2E_BASE_URL`. For another document root or a Node.js, Python or other startup command, see [local application servers](../testing/webservers.md).
+
+## Configure PHPUnit
 
 Create `phpunit.xml.dist` in the test repository root, or add this suite to your existing configuration:
 
@@ -65,7 +86,13 @@ Create `phpunit.xml.dist` in the test repository root, or add this suite to your
 
 ## Run the test
 
-With your application reachable, run from the test repository root:
+For tests that start their own local server, run from the test repository root:
+
+```shell
+vendor/bin/phpunit --testsuite=e2e
+```
+
+For tests that connect to an existing server, keep that server running and supply its URL:
 
 ```shell
 E2E_BASE_URL=http://localhost:8080 vendor/bin/phpunit --testsuite=e2e
@@ -86,9 +113,9 @@ A URL subdirectory is supported. For example, with `E2E_BASE_URL=https://example
 
 The same setup works in a non-Contao monorepo. Keep the Composer test harness at the repository root for shared tests, or in an application directory for tests owned by that application. Run the installation and PHPUnit commands from that harness directory.
 
-Build and serve the application using your monorepo's normal commands, then point `ApplicationConfig` at its URL. Your application's build or package manager handles local package dependencies. You do not need `MonorepoProject` for URL-based tests.
+Your application's build or package manager handles local package dependencies. Point `ApplicationConfig` at an existing server URL, or give `LocalApplicationConfig` the application directory and its startup command. You do not need `MonorepoProject` for these tests.
 
-If the monorepo serves several applications, give each application's test class its own base URL in `createApplicationConfig()`. For example, read `SHOP_E2E_BASE_URL` in shop tests and `ADMIN_E2E_BASE_URL` in admin tests.
+If the monorepo contains several applications, give each application's test class its own configuration. Local servers get independent ports. For existing servers, read a separate URL variable such as `SHOP_E2E_BASE_URL` or `ADMIN_E2E_BASE_URL` in each class.
 
 ## Keep tests independent
 

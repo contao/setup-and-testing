@@ -16,6 +16,10 @@ Verify Docker is running and configured for Linux containers. Alternatively, set
 
 Verify that the application is reachable from the machine running PHPUnit. If its server is not running, start it with your project's usual command and wait until it is ready. The URL-based test configuration does not start a server. Include any application base path. CI's `localhost` refers to its runner, not your development machine.
 
+## A local application server cannot start
+
+Check that the configured working directory and PHP document root exist. Custom commands must run in the foreground and listen on `127.0.0.1` using the supplied `{port}`. Install their runtime and build the application before running PHPUnit. When the command exits early, the startup error reports its exit code. Check your application logs for the cause. See [local application servers](../testing/webservers.md).
+
 ## Composer cannot resolve local packages
 
 Check each package name, path and dependency constraint. The version passed to `withPathPackage()` must satisfy constraints from other packages. In a monorepo, inspect the root version or `dev-main` branch alias used by `MonorepoProject`. See [Contao package monorepo tests](../guides/monorepo.md).

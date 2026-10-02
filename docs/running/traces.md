@@ -47,7 +47,7 @@ Recording slows down every test, so leave `CONTAO_E2E_TRACE` unset on CI and onl
 
 ## Choose the trace directory
 
-Existing-application tests write to `.contao-e2e/traces` relative to the PHPUnit working directory. To use another directory, add `withTraceDirectory()` to the configuration returned by `createApplicationConfig()`:
+URL-based and local-server tests write to `.contao-e2e/traces` relative to the PHPUnit working directory. To use another directory, add `withTraceDirectory()` to the configuration returned by `createApplicationConfig()`:
 
 ```php
 use Contao\E2eTesting\Application\ApplicationConfig;
@@ -56,4 +56,4 @@ $config = ApplicationConfig::create('http://localhost:8080')
     ->withTraceDirectory(dirname(__DIR__, 2).'/.contao-e2e/traces');
 ```
 
-Import `ApplicationConfig` at the top of the file. Adjust the path for your test directory. `withTraceDirectory()` returns a new configuration. Managed Editions store traces below their configured E2E workspace.
+Import `ApplicationConfig` at the top of the file. Adjust the path for your test directory. `withTraceDirectory()` returns a new configuration. `LocalApplicationConfig` provides the same method. Managed Editions store traces below their configured E2E workspace.

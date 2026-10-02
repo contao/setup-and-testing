@@ -20,6 +20,6 @@ The recipe package does not require Contao core, PHPUnit or browser tooling.
 
 Managed Edition tests also need Git, Docker with Linux containers or an administrative MySQL/MariaDB server, and Contao's required PHP extensions such as `intl`, `mbstring` and `pdo_mysql`. The recipe selects the Contao version. The testing package does not require a specific Contao bundle version.
 
-Existing-application tests manage their own server and database infrastructure. PHPUnit still runs in PHP when the application uses another language.
+Tests for your own application can start a local server or connect to an existing URL. Your project prepares application dependencies and database state. PHPUnit still runs in PHP when the application uses another language.
 
 See [Windows setup](../running/windows.md) and [CI setup](../running/ci.md) for platform instructions. The Composer manifests remain authoritative for supported dependency constraints.

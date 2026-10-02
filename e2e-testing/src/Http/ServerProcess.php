@@ -16,11 +16,14 @@ use Symfony\Component\Process\Process;
 
 final class ServerProcess
 {
+    private readonly WebServerProcess $process;
+
     public function __construct(
-        private readonly Process $process,
+        Process|WebServerProcess $process,
         public readonly int $port,
         public readonly string $mappingFile,
     ) {
+        $this->process = $process instanceof WebServerProcess ? $process : new WebServerProcess($process, $port);
     }
 
     public function __destruct()
@@ -30,8 +33,6 @@ final class ServerProcess
 
     public function stop(): void
     {
-        if ($this->process->isRunning()) {
-            $this->process->stop(3);
-        }
+        $this->process->stop();
     }
 }

@@ -17,6 +17,7 @@ use Contao\E2eTesting\Http\ServerManager;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\Filesystem\Path;
+use Symfony\Component\HttpClient\HttpClient;
 
 class ServerManagerTest extends TestCase
 {
@@ -71,6 +72,50 @@ class ServerManagerTest extends TestCase
                 }
             }
         } finally {
+            $filesystem->remove($directory);
+        }
+    }
+
+    public function testSharedServerPreservesContaoRoutingEnvironmentAndShutdown(): void
+    {
+        $filesystem = new Filesystem();
+        $directory = sys_get_temp_dir().'/contao e2e server '.bin2hex(random_bytes(8));
+        $filesystem->dumpFile($directory.'/public/index.php', <<<'PHP'
+            <?php
+            echo json_encode([
+                'host' => $_SERVER['HTTP_HOST'],
+                'https' => $_SERVER['HTTPS'] ?? null,
+                'port' => $_SERVER['SERVER_PORT'],
+                'uri' => $_SERVER['REQUEST_URI'],
+                'database' => getenv('DATABASE_URL'),
+                'cache' => getenv('DISABLE_HTTP_CACHE'),
+            ]);
+            PHP);
+        $filesystem->dumpFile($directory.'/public/my style.css', 'body {}');
+
+        $server = (new ServerManager($filesystem))->start($directory, 'sqlite:///:memory:', $directory.'/runtime');
+
+        try {
+            $filesystem->dumpFile($server->mappingFile, json_encode(['transport.test' => ['host' => 'example.org', 'https' => true]], JSON_THROW_ON_ERROR));
+            $baseUri = 'http://127.0.0.1:'.$server->port;
+            $response = HttpClient::create()->request('GET', $baseUri.'/api/data.json?example=1', ['headers' => ['Host' => 'transport.test']]);
+            $this->assertSame(
+                [
+                    'host' => 'example.org',
+                    'https' => 'on',
+                    'port' => '443',
+                    'uri' => '/api/data.json?example=1',
+                    'database' => 'sqlite:///:memory:',
+                    'cache' => '1',
+                ],
+                $response->toArray(),
+            );
+            $this->assertSame('body {}', HttpClient::create()->request('GET', $baseUri.'/my%20style.css')->getContent());
+            $server->stop();
+            $server->stop();
+            $this->assertFalse(@stream_socket_client('tcp://127.0.0.1:'.$server->port));
+        } finally {
+            $server->stop();
             $filesystem->remove($directory);
         }
     }

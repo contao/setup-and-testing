@@ -6,6 +6,7 @@ Use the provided abstract test cases for the simplest integration. If your tests
 
 ```php
 use Contao\E2eTesting\Application\ApplicationConfig;
+use Contao\E2eTesting\Application\ApplicationConfigInterface;
 use Contao\E2eTesting\Application\ApplicationTestTrait;
 use PHPUnit\Framework\TestCase;
 
@@ -13,7 +14,7 @@ final class HomepageTest extends TestCase
 {
     use ApplicationTestTrait;
 
-    protected static function createApplicationConfig(): ApplicationConfig
+    protected static function createApplicationConfig(): ApplicationConfigInterface
     {
         return ApplicationConfig::create(getenv('E2E_BASE_URL') ?: 'http://localhost:8080');
     }
@@ -27,6 +28,8 @@ final class HomepageTest extends TestCase
 ```
 
 Replace `TestCase` with your own base class. The trait supplies class-level creation and release, inter-test resets, selector assertions and tracing.
+
+For tests that start a local server, return a `LocalApplicationConfig` instead. See [local application servers](webservers.md) for the PHP and custom-command options.
 
 ## Managed Editions
 
@@ -45,7 +48,7 @@ The environment applies to setup, migrations and HTTP requests. Changing it refr
 
 ## Customize application setup and resets
 
-Both configurations implement `ApplicationConfigInterface`, which creates an `ApplicationInterface`. A custom configuration can implement this contract to provide application-state resets without changing the shared trait. `ApplicationInterface::resetState()` defines the reset between tests. URL-based applications close browser contexts, while Managed Editions also restore database fixtures, including when configured directly through `ApplicationTestTrait`.
+URL-based, local-server and Managed Edition configurations implement `ApplicationConfigInterface`, which creates an `ApplicationInterface`. A custom configuration can implement this contract to provide application-state resets without changing the shared trait. `ApplicationInterface::resetState()` defines the reset between tests. URL-based and local-server applications close browser contexts, while Managed Editions also restore database fixtures, including when configured directly through `ApplicationTestTrait`.
 
 The first test uses the freshly created application without calling `resetState()`. Your custom factory must therefore prepare the initial test data. Later tests call `resetState()` by default. Override `shouldResetApplication()` only when your test setup intentionally manages resets itself. In that case, manage browser cleanup as well as application state.
 

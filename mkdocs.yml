@@ -46,7 +46,7 @@ nav:
           - Test a Contao extension: guides/contao-extension.md
           - Test Contao packages in a monorepo: guides/monorepo.md
           - Test an existing Contao project: guides/contao-project.md
-          - Test an existing web application: guides/web-application.md
+          - Test a web application: guides/web-application.md
           - Build a reusable recipe: guides/build-recipe.md
           - Apply a recipe: guides/apply-recipe.md
     - Recipes:
@@ -55,6 +55,7 @@ nav:
           - Portable archives: recipes/archives.md
           - Installation and runtime integration: recipes/installation.md
     - Testing:
+          - Local application servers: testing/webservers.md
           - Browsers and assertions: testing/browsers.md
           - Contao backend interactions: testing/backend.md
           - Frontend tests and origins: testing/frontend.md
