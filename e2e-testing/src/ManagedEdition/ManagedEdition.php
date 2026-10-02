@@ -12,8 +12,10 @@ declare(strict_types=1);
 
 namespace Contao\E2eTesting\ManagedEdition;
 
+use Contao\E2eTesting\Application\ApplicationInterface;
 use Contao\E2eTesting\Browser\BackendBrowser;
 use Contao\E2eTesting\Browser\BrowserOptions;
+use Contao\E2eTesting\Browser\BrowserRuntime;
 use Contao\E2eTesting\Browser\BrowserSession;
 use Contao\E2eTesting\Browser\BrowserType;
 use Contao\E2eTesting\Browser\PlaywrightManager;
@@ -25,23 +27,17 @@ use Contao\E2eTesting\Http\ServerManager;
 use Contao\E2eTesting\Http\ServerProcess;
 use Contao\InstallationRecipe\Fixture\FixtureResult;
 use Contao\InstallationRecipe\Fixture\FixtureSet;
-use Playwright\Page\PageInterface;
 use Symfony\Component\BrowserKit\HttpBrowser;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\Filesystem\Path;
 use Symfony\Component\HttpClient\HttpClient;
 use Symfony\Contracts\HttpClient\ResponseInterface;
 
-final class ManagedEdition
+final class ManagedEdition implements ApplicationInterface
 {
     private ServerProcess|null $server = null;
 
-    /**
-     * @var list<BrowserSession>
-     */
-    private array $browserSessions = [];
-
-    private BrowserSession|null $currentBrowser = null;
+    private readonly BrowserRuntime $browserRuntime;
 
     private string|null $preparedFixtureFingerprint = null;
 
@@ -50,8 +46,12 @@ final class ManagedEdition
     public function __construct(
         private readonly ManagedEditionState $state,
         private readonly ServerManager $serverManager = new ServerManager(),
-        private readonly PlaywrightManager $playwrightManager = new PlaywrightManager(),
+        PlaywrightManager $playwrightManager = new PlaywrightManager(),
     ) {
+        $this->browserRuntime = new BrowserRuntime(
+            Path::join($this->state->config->environment->cache->rootDirectory, 'traces'),
+            $playwrightManager,
+        );
     }
 
     public function __destruct()
@@ -101,9 +101,15 @@ final class ManagedEdition
         return $result;
     }
 
+    public function resetState(): void
+    {
+        $this->resetDatabase();
+    }
+
     public function resetRuntime(): void
     {
-        $this->resetRuntimeState();
+        $this->browserRuntime->reset();
+        $this->clearMutableRuntime();
     }
 
     public function synchronizeFiles(string ...$paths): void
@@ -169,75 +175,28 @@ final class ManagedEdition
         return $browser;
     }
 
-    public function createBrowser(BrowserType $type = BrowserType::Firefox, Origin|null $origin = null, BrowserOptions|null $options = null): BrowserSession
+    public function createBrowser(BrowserType $type = BrowserType::Firefox, BrowserOptions|null $options = null, Origin|null $origin = null): BrowserSession
     {
-        $options ??= BrowserOptions::create();
-        $browser = $this->playwrightManager->create($type, $this->browserUri($origin), $options);
-        $this->browserSessions[] = $browser;
-        $this->currentBrowser = $browser;
-
-        return $browser;
+        return $this->browserRuntime->createBrowser($this->browserUri($origin), $type, $options);
     }
 
-    public function createBackendBrowser(BrowserType $type = BrowserType::Firefox, Origin|null $origin = null, BrowserOptions|null $options = null): BackendBrowser
+    public function createBackendBrowser(BrowserType $type = BrowserType::Firefox, BrowserOptions|null $options = null, Origin|null $origin = null): BackendBrowser
     {
-        return new BackendBrowser($this->createBrowser($type, $origin, $options));
+        return new BackendBrowser($this->createBrowser($type, $options, $origin));
     }
 
-    public function currentPage(): PageInterface
+    public function browserRuntime(): BrowserRuntime
     {
-        if (!$this->currentBrowser) {
-            throw new \LogicException('Create a Playwright browser before using selector assertions.');
-        }
-
-        return $this->currentBrowser->page();
-    }
-
-    /**
-     * Finishes the traces of all open browser sessions and writes them to traces.
-     *
-     * @return list<string>
-     */
-    public function finishTracing(string $name): array
-    {
-        $name = trim((string) preg_replace('/[^A-Za-z0-9._-]+/', '-', $name), '-');
-        $directory = Path::join($this->state->config->environment->cache->rootDirectory, 'traces');
-        $paths = [];
-
-        (new Filesystem())->mkdir($directory);
-
-        foreach ($this->browserSessions as $i => $session) {
-            $paths[] = $path = Path::join($directory, $name.($i ? '-'.($i + 1) : '').'.zip');
-            $session->context()->tracing()->stop(['path' => $path]);
-        }
-
-        return $paths;
+        return $this->browserRuntime;
     }
 
     public function release(): void
     {
-        $this->closeBrowserSessions();
-        $this->playwrightManager->close();
+        $this->browserRuntime->close();
         $this->server?->stop();
         $this->server = null;
         $this->database()->close();
         $this->state->installation->lease->release();
-    }
-
-    private function resetRuntimeState(): void
-    {
-        $this->closeBrowserSessions();
-        $this->clearMutableRuntime();
-    }
-
-    private function closeBrowserSessions(): void
-    {
-        foreach ($this->browserSessions as $browser) {
-            $browser->close();
-        }
-
-        $this->browserSessions = [];
-        $this->currentBrowser = null;
     }
 
     private function registerOrigin(Origin $origin): string

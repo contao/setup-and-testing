@@ -1,6 +1,6 @@
 # Contao E2E testing
 
-`contao/e2e-testing` owns the test runtime. It consumes recipes from `contao/installation-recipe` to prepare a real Contao Managed Edition and migrate an isolated MySQL/MariaDB database. Tests can make direct HTTP requests, use Symfony BrowserKit for HTTP tests without JavaScript, or drive a real browser with Playwright. The test suite selects the Contao version in its recipe because this library does not require a Contao bundle.
+`contao/e2e-testing` owns the test runtime for Contao and other web applications. It can test an already running application through its base URL, or consume recipes from `contao/installation-recipe` to prepare a real Contao Managed Edition and migrate an isolated MySQL/MariaDB database. Tests can make direct HTTP requests, use Symfony BrowserKit for HTTP tests without JavaScript, or drive a real browser with Playwright. Managed Edition tests select the Contao version in their recipe because this library does not require a Contao bundle.
 
 Install it as a development dependency in the project under test. Composer also installs `contao/installation-recipe`, which provides the recipe model used below:
 
@@ -8,9 +8,56 @@ Install it as a development dependency in the project under test. Composer also 
 composer require --dev contao/e2e-testing
 ```
 
+## Test an existing application
+
+Use `AbstractApplicationTestCase` to test any running web application. The application can be a complete Contao project or use another framework or language. Start its server before PHPUnit, then supply its base URL:
+
+```php
+use Contao\E2eTesting\Application\AbstractApplicationTestCase;
+use Contao\E2eTesting\Application\ApplicationConfig;
+
+final class HomepageTest extends AbstractApplicationTestCase
+{
+    protected static function createApplicationConfig(): ApplicationConfig
+    {
+        return ApplicationConfig::create(
+            getenv('E2E_BASE_URL') ?: 'http://localhost:8080',
+        )->withTraceDirectory(dirname(__DIR__, 2).'/.contao-e2e/traces');
+    }
+
+    public function testHomepage(): void
+    {
+        $browser = self::application()->createBrowser();
+        $browser->visit('/');
+
+        $this->assertSelectorTextContains('h1', 'Welcome');
+    }
+}
+```
+
+Install the browser binaries as described in [Browser tests](#browser-tests), add the tests to your PHPUnit configuration, and run them with the application's URL:
+
+```shell
+E2E_BASE_URL=http://localhost:8080 vendor/bin/phpunit --testsuite=e2e
+```
+
+`ApplicationTestTrait` supplies the same integration when your tests already extend another PHPUnit base class. Each test starts with fresh browser contexts and independent cookies and storage. The browser engine is reused across the class and closed at the end. Your project controls server startup, application configuration, database fixtures and any application state reset between tests.
+
+`ApplicationConfig::create()` accepts an absolute HTTP or HTTPS URL, including a base path such as `https://example.test/app`. `withTraceDirectory()` returns a cloned configuration. The default trace directory is `.contao-e2e/traces` relative to the working directory. Browser engine selection, `BrowserOptions`, Playwright environment variables, and `CONTAO_E2E_TRACE` work as described below for both application modes.
+
+For an existing Contao project, frontend tests use `createBrowser()` and backend tests can use the usual helpers:
+
+```php
+$backend = self::application()->createBackendBrowser();
+$backend->visit('/contao/login');
+$backend->submitLogin('admin', 'password');
+```
+
+For use outside the PHPUnit traits, create `Application` with the configuration, call `createBrowser()` or `createBackendBrowser()`, and call `release()` in a `finally` block. `BrowserRuntime` owns session tracking, current-page access, trace output and cleanup. `ApplicationTestTrait` supplies the shared PHPUnit lifecycle, assertions and tracing for all application tests. `ManagedEditionTestTrait` supplies the Managed Edition configuration type and access to Contao-specific operations. Provisioning and database resets belong to the configuration and application implementations. `ApplicationInterface::resetState()` defines the reset between tests. URL-based applications close their browser contexts, while Managed Editions also restore their database fixtures, including when used directly with `ApplicationTestTrait`. Both configurations implement `ApplicationConfigInterface`, which creates an `ApplicationInterface` for the shared lifecycle. Custom configurations can implement the same contract without changing the trait.
+
 ## Database setup
 
-If Docker is available, no database setup is needed. The first test starts a reusable `mariadb:11.4` container on a random loopback port. The last E2E process stops it, and subsequent runs restart the same container. Its `/var/lib/mysql` directory is bind-mounted to `.contao-e2e/database/data`, so all generated database files remain inside the project-local E2E workspace. Parallel test workers keep shared leases and only the final worker stops the database. If a process is killed before PHP can run its shutdown handlers, `database:stop` cleans up any remaining containers.
+For Managed Edition tests, no database setup is needed when Docker is available. The first test starts a reusable `mariadb:11.4` container on a random loopback port. The last E2E process stops it, and subsequent runs restart the same container. Its `/var/lib/mysql` directory is bind-mounted to `.contao-e2e/database/data`, so all generated database files remain inside the project-local E2E workspace. Parallel test workers keep shared leases and only the final worker stops the database. If a process is killed before PHP can run its shutdown handlers, `database:stop` cleans up any remaining containers.
 
 Select a database explicitly in the PHPUnit configuration when an extension supports a particular database range:
 
@@ -49,7 +96,7 @@ final class ManagedEditionSmokeTest extends TestCase implements DockerServicePro
 {
     use ManagedEditionTestTrait;
 
-    protected static function createManagedEditionConfig(): ManagedEditionConfig
+    protected static function createApplicationConfig(): ManagedEditionConfig
     {
         $bundleRoot = dirname(__DIR__, 2);
         $composer = ComposerConfig::managedEdition('^5.7')
@@ -60,7 +107,7 @@ final class ManagedEditionSmokeTest extends TestCase implements DockerServicePro
 
     public static function dockerServices(): iterable
     {
-        return static::createManagedEditionConfig()->dockerServices();
+        return static::createApplicationConfig()->dockerServices();
     }
 }
 ```
@@ -95,7 +142,7 @@ $devConfig = $config->withAppEnvironment('dev');
 $prodConfig = $config->withAppEnvironment('prod');
 ```
 
-Changing the environment refreshes the cached application setup. The selected environment applies to Contao setup commands, database migration, and HTTP requests. With `ManagedEditionTestTrait`, return the desired configuration from `createManagedEditionConfig()` for each test class.
+Changing the environment refreshes the cached application setup. The selected environment applies to Contao setup commands, database migration, and HTTP requests. With `ManagedEditionTestTrait`, return the desired configuration from `createApplicationConfig()` for each test class.
 
 ## Browser tests
 
@@ -193,7 +240,7 @@ use Contao\InstallationRecipe\Recipe\InstallationRecipe;
 
 final class ManagedEditionSmokeTest extends AbstractManagedEditionTestCase
 {
-    protected static function createManagedEditionConfig(): ManagedEditionConfig
+    protected static function createApplicationConfig(): ManagedEditionConfig
     {
         $bundleRoot = dirname(__DIR__, 2);
         $composer = ComposerConfig::managedEdition('^5.7')
@@ -239,6 +286,19 @@ vendor/bin/phpunit --configuration=phpunit.xml.dist tests/E2e/ManagedEditionSmok
 `withPathPackage()` makes Composer require your bundle from its local directory and symlink it into the Managed Edition's `vendor/`. The test sees the current working tree, including uncommitted PHP changes. Source changes invalidate the cached application setup on the next test process. Changes to a linked bundle's `composer.json` select a fresh dependency installation so Composer resolves the new requirements.
 
 The trait works with PHPUnit 10 through 13 and does not impose a test base class. Once the smoke test runs, replace its login-page assertion with checks for your bundle's behavior. Add database fixtures with `InstallationRecipe::withFixtureFile()` when the test needs existing pages or backend users.
+
+### Frontend tests in a Managed Edition
+
+The same isolated Contao installation can serve frontend and backend tests. Prepare the page structure and content through recipe fixtures, and add project files such as templates and assets through recipe file mappings. Then visit a frontend URL with the generic browser:
+
+```php
+$browser = self::managedEdition()->createBrowser();
+$browser->visit('/');
+
+$this->assertSelectorTextContains('h1', 'Welcome');
+```
+
+Use `Origin::http('example.test')` or `Origin::https('example.test')` when a frontend fixture needs a specific page domain. Managed Edition mode builds a recipe-based test installation. URL-based application tests exercise the project served at the supplied URL.
 
 ### Test-specific DCA
 

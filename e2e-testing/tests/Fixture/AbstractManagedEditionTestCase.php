@@ -20,7 +20,7 @@ use Contao\InstallationRecipe\Recipe\InstallationRecipe;
 
 abstract class AbstractManagedEditionTestCase extends BaseManagedEditionTestCase
 {
-    protected static function createManagedEditionConfig(): ManagedEditionConfig
+    protected static function createApplicationConfig(): ManagedEditionConfig
     {
         return ManagedEditionConfig::create(
             InstallationRecipe::create(ComposerConfig::managedEdition('^5.7')),
