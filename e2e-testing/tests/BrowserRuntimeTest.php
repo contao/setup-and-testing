@@ -22,6 +22,7 @@ use Playwright\Browser\BrowserContextInterface;
 use Playwright\Page\PageInterface;
 use Playwright\Tracing\TracingInterface;
 use Symfony\Component\Filesystem\Filesystem;
+use Symfony\Component\Filesystem\Path;
 
 class BrowserRuntimeTest extends TestCase
 {
@@ -87,7 +88,7 @@ class BrowserRuntimeTest extends TestCase
 
     public function testWritesDistinctSanitizedTracePathsForMultipleSessions(): void
     {
-        $directory = sys_get_temp_dir().'/browser-runtime-'.bin2hex(random_bytes(6));
+        $directory = Path::join(sys_get_temp_dir(), 'browser-runtime-'.bin2hex(random_bytes(6)));
         $factory = $this->createMock(BrowserSessionFactoryInterface::class);
         $factory
             ->expects($this->exactly(2))
