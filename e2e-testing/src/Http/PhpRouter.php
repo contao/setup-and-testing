@@ -25,7 +25,7 @@ final class PhpRouter
 
             $prelude
 
-            \$path = rawurldecode(parse_url(\$_SERVER['REQUEST_URI'], PHP_URL_PATH) ?? '/');
+            \$path = rawurldecode((string) parse_url(\$_SERVER['REQUEST_URI'], PHP_URL_PATH) ?: '/');
 
             if ('/' !== \$path && is_file(\$_SERVER['DOCUMENT_ROOT'].\$path)) {
                 return false;
