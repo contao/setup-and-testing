@@ -65,6 +65,19 @@ class LocalApplicationServerTest extends TestCase
         $this->assertStopped($server->baseUri);
     }
 
+    public function testPhpServerPassesDoubleSlashRequestsToTheFrontController(): void
+    {
+        $server = (new WebServerManager())->start(WebServerConfig::php($this->directory));
+
+        try {
+            $response = HttpClient::create()->request('GET', $server->baseUri.'//');
+            $this->assertSame(200, $response->getStatusCode());
+            $this->assertSame('//', $response->toArray()['uri']);
+        } finally {
+            $server->stop();
+        }
+    }
+
     public function testServerLoggingCannotBlockRequests(): void
     {
         (new Filesystem())->dumpFile($this->directory.'/public/index.php', '<?php error_log(str_repeat("x", 8192)); echo "OK";');
