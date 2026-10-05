@@ -14,17 +14,49 @@ namespace Contao\E2eTesting\Tests;
 
 use Contao\E2eTesting\Application\Application;
 use Contao\E2eTesting\Application\ApplicationConfig;
+use Contao\E2eTesting\Browser\BackendBrowser;
 use Contao\E2eTesting\Browser\BrowserOptions;
 use Contao\E2eTesting\Browser\BrowserRuntime;
 use Contao\E2eTesting\Browser\BrowserSession;
 use Contao\E2eTesting\Browser\BrowserSessionFactoryInterface;
 use Contao\E2eTesting\Browser\BrowserType;
+use Contao\E2eTesting\Http\Origin;
+use Contao\E2eTesting\Http\WebServerConfig;
+use Contao\E2eTesting\Http\WebServerManager;
 use PHPUnit\Framework\TestCase;
 use Playwright\Browser\BrowserContextInterface;
 use Playwright\Page\PageInterface;
+use Symfony\Component\Filesystem\Filesystem;
 
 class ApplicationTest extends TestCase
 {
+    public function testPlaywrightUsesTheSharedOriginMapping(): void
+    {
+        $filesystem = new Filesystem();
+        $directory = sys_get_temp_dir().'/application-origin-'.bin2hex(random_bytes(6));
+        $filesystem->dumpFile($directory.'/public/index.php', '<?php echo "OK";');
+        $server = (new WebServerManager())->start(WebServerConfig::php($directory));
+        $origin = Origin::https('example.test');
+        $uri = $server->originUri($origin).'/app';
+        $session = new BrowserSession($uri, $this->createStub(BrowserContextInterface::class), $this->createStub(PageInterface::class));
+        $factory = $this->createMock(BrowserSessionFactoryInterface::class);
+        $factory
+            ->expects($this->once())
+            ->method('create')
+            ->with(BrowserType::Firefox, $uri, $this->isInstanceOf(BrowserOptions::class))
+            ->willReturn($session)
+        ;
+        $application = new Application(ApplicationConfig::create($server->baseUri.'/app'), new BrowserRuntime('/unused', $factory), $server);
+
+        try {
+            $this->assertSame($session, $application->createBrowser(origin: $origin));
+            $this->assertSame($uri.'/endpoint', $application->uri('/endpoint', $origin));
+        } finally {
+            $application->release();
+            $filesystem->remove($directory);
+        }
+    }
+
     public function testExistingContaoBackendUsesTheSameGenericBrowserRuntime(): void
     {
         $page = $this->createStub(PageInterface::class);
@@ -49,7 +81,7 @@ class ApplicationTest extends TestCase
         ;
         $application = new Application(ApplicationConfig::create('http://localhost:8080'), new BrowserRuntime('/unused', $factory));
 
-        $backend = $application->createBackendBrowser(options: $options);
+        $backend = new BackendBrowser($application->createBrowser(options: $options));
         $this->assertSame($session, $backend->browser());
         $this->assertSame($page, $application->browserRuntime()->currentPage());
         $application->resetState();

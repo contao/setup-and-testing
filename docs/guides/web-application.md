@@ -109,6 +109,40 @@ PHPUnit should report a passing test. Replace the `h1` check with an assertion t
 
 A URL subdirectory is supported. For example, with `E2E_BASE_URL=https://example.test/app`, `visit('/login')` opens `/app/login`. Use an absolute HTTP or HTTPS URL without a query or fragment.
 
+## Test HTTP endpoints
+
+The same application API supports HTTP requests without starting a browser:
+
+```php
+use Contao\E2eTesting\Http\HttpRequest;
+
+$request = HttpRequest::json('POST', '/api/example')
+    ->withHeader('Authorization', 'Bearer e2e')
+    ->withJson(['title' => 'Example']);
+
+$response = self::application()->send($request);
+$this->assertSame(201, $response->getStatusCode());
+$this->assertSame('Example', $response->toArray(false)['title']);
+```
+
+Paths use the configured application URL, including its subdirectory. For a request without custom headers or a body, use `self::application()->send(HttpRequest::get('/api/example'))`. See [HTTP and JSON requests](../testing/frontend.md#test-http-and-json-endpoints) for JSON bodies and custom media types. Redirects are not followed automatically.
+
+For HTML tests without JavaScript, use `self::application()->createHttpBrowser()`. This returns Symfony BrowserKit's HTTP browser, whose request paths resolve from the server root. For applications in a subdirectory, pass the full URL from `self::application()->uri('/login')`.
+
+### Emulate an origin
+
+With `LocalApplicationConfig::php()` and its generated router, the application can emulate a domain and HTTPS without DNS or certificates:
+
+```php
+use Contao\E2eTesting\Http\Origin;
+
+$response = self::application()->send(
+    HttpRequest::json('GET', '/api/example', Origin::https('example.test')),
+);
+```
+
+Pass an optional origin to `HttpRequest::get()` or `HttpRequest::create()` for other HTTP requests. It also works with `createHttpBrowser()` and `createBrowser(origin: ...)`. Existing servers, custom PHP routers and custom startup commands must provide their own domain and HTTPS handling. Without an origin, all methods use the actual application URL.
+
 ## Use this in a monorepo
 
 The same setup works in a non-Contao monorepo. Keep the Composer test harness at the repository root for shared tests, or in an application directory for tests owned by that application. Run the installation and PHPUnit commands from that harness directory.
