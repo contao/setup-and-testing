@@ -13,6 +13,8 @@ declare(strict_types=1);
 namespace Contao\InstallationRecipe\Configuration;
 
 use Contao\InstallationRecipe\Exception\InvalidRecipeException;
+use Contao\InstallationRecipe\File\InstallationPathValidator;
+use Contao\InstallationRecipe\File\PortableFilePolicy;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\Filesystem\Path;
 use Symfony\Component\Yaml\Exception\ParseException;
@@ -20,8 +22,15 @@ use Symfony\Component\Yaml\Yaml;
 
 final readonly class ConfigMerger
 {
-    public function __construct(private Filesystem $filesystem = new Filesystem())
+    public function __construct(
+        private Filesystem $filesystem = new Filesystem(),
+        private PortableFilePolicy|null $policy = null,
+    ) {
+    }
+
+    public function withPolicy(PortableFilePolicy $policy): self
     {
+        return new self($this->filesystem, $policy);
     }
 
     /**
@@ -33,7 +42,9 @@ final readonly class ConfigMerger
             return false;
         }
 
-        $configFile = Path::join($targetDirectory, 'config/config.yaml');
+        $paths = new InstallationPathValidator();
+        $configFile = $paths->validate($targetDirectory, 'config/config.yaml');
+        $this->policy?->forInstallation($targetDirectory)->validateDocumentTarget('config/config.yaml', Path::makeRelative($configFile, $paths->root($targetDirectory)));
         $config = is_file($configFile) ? $this->parse($configFile) : [];
         $original = $config;
 

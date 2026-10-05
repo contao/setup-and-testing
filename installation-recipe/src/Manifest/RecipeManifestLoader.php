@@ -16,6 +16,7 @@ use Contao\InstallationRecipe\Composer\ComposerDependencies;
 use Contao\InstallationRecipe\Configuration\ConfigFragment;
 use Contao\InstallationRecipe\Exception\InvalidRecipeException;
 use Contao\InstallationRecipe\File\FileMapping;
+use Contao\InstallationRecipe\File\PortableFilePolicy;
 use Contao\InstallationRecipe\Fixture\FixtureSet;
 use Contao\InstallationRecipe\Recipe\PortableInstallationRecipe;
 use Contao\InstallationRecipe\Recipe\RecipeAssets;
@@ -137,7 +138,9 @@ final readonly class RecipeManifestLoader
                 throw new InvalidRecipeException('A recipe file mapping needs a string target and an optional boolean overwrite value.');
             }
 
-            $result[] = new FileMapping($this->path($directory, $mapping['source'] ?? null, 'files.source'), $target, $overwrite);
+            $fileMapping = new FileMapping($this->path($directory, $mapping['source'] ?? null, 'files.source'), $target, $overwrite);
+            (new PortableFilePolicy())->withOverwrite(true)->withProtectedTargets([])->validate($fileMapping);
+            $result[] = $fileMapping;
         }
 
         return $result;

@@ -29,6 +29,7 @@ final readonly class ApplicationPreparer
 
     public function prepare(ManagedEditionConfig $config, string $directory, InstallationManifest|null $manifest): void
     {
+        $this->filesystem->mkdir($directory);
         $this->removePreviousRecipe($directory, $manifest);
         $recipe = $config->recipe;
         $this->configInstaller->install($recipe->assets->configFragments, $directory);
