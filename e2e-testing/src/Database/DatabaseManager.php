@@ -100,10 +100,10 @@ final class DatabaseManager
      */
     private function connectionParameters(string $url): array
     {
-        return new DsnParser([
+        return (new DsnParser([
             'mysql' => 'pdo_mysql',
             'pdo-mysql' => 'pdo_mysql',
             'mysqli' => 'mysqli',
-        ])->parse($url);
+        ]))->parse($url);
     }
 }

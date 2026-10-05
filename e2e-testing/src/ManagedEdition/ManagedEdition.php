@@ -13,6 +13,7 @@ declare(strict_types=1);
 namespace Contao\E2eTesting\ManagedEdition;
 
 use Contao\E2eTesting\Application\ApplicationInterface;
+use Contao\E2eTesting\Application\HttpApplicationTrait;
 use Contao\E2eTesting\Browser\BackendBrowser;
 use Contao\E2eTesting\Browser\BrowserOptions;
 use Contao\E2eTesting\Browser\BrowserRuntime;
@@ -21,20 +22,19 @@ use Contao\E2eTesting\Browser\BrowserType;
 use Contao\E2eTesting\Browser\PlaywrightManager;
 use Contao\E2eTesting\Database\DatabaseManager;
 use Contao\E2eTesting\Database\DatabaseResetMode;
-use Contao\E2eTesting\Http\HttpRequest;
 use Contao\E2eTesting\Http\Origin;
+use Contao\E2eTesting\Http\OriginMap;
 use Contao\E2eTesting\Http\ServerManager;
 use Contao\E2eTesting\Http\ServerProcess;
 use Contao\InstallationRecipe\Fixture\FixtureResult;
 use Contao\InstallationRecipe\Fixture\FixtureSet;
-use Symfony\Component\BrowserKit\HttpBrowser;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\Filesystem\Path;
-use Symfony\Component\HttpClient\HttpClient;
-use Symfony\Contracts\HttpClient\ResponseInterface;
 
 final class ManagedEdition implements ApplicationInterface
 {
+    use HttpApplicationTrait;
+
     private ServerProcess|null $server = null;
 
     private readonly BrowserRuntime $browserRuntime;
@@ -133,51 +133,19 @@ final class ManagedEdition implements ApplicationInterface
         return $this;
     }
 
-    public function uri(Origin $origin, string $path = '/'): string
+    public function uri(string $path = '/', Origin|null $origin = null): string
     {
         $this->startServer();
-        $alias = $this->registerOrigin($origin);
+        $server = $this->server ?? throw new \LogicException('The E2E web server did not start.');
+        $host = !$origin ? 'localhost' : (new OriginMap($server->mappingFile))->register($origin);
         $path = str_starts_with($path, '/') ? $path : '/'.$path;
 
-        return 'http://'.$alias.'.localhost:'.$this->server->port.$path;
-    }
-
-    public function request(string $method, string $path, Origin $origin): ResponseInterface
-    {
-        return HttpClient::create(['max_redirects' => 0])->request($method, $this->uri($origin, $path));
-    }
-
-    public function send(HttpRequest $request): ResponseInterface
-    {
-        return HttpClient::create(['max_redirects' => 0])->request(
-            'GET',
-            $this->uri($request->origin, $request->path),
-            [
-                'headers' => $request->headers,
-            ],
-        );
-    }
-
-    public function createHttpBrowser(Origin $origin): HttpBrowser
-    {
-        $transportUri = $this->uri($origin);
-        $host = parse_url($transportUri, PHP_URL_HOST);
-        $port = parse_url($transportUri, PHP_URL_PORT);
-
-        if (!\is_string($host)) {
-            throw new \LogicException('Could not determine the E2E web server host.');
-        }
-
-        $browser = new HttpBrowser(HttpClient::create(['max_redirects' => 0]));
-        $browser->followRedirects(false);
-        $browser->setServerParameter('HTTP_HOST', $host.(\is_int($port) ? ':'.$port : ''));
-
-        return $browser;
+        return 'http://'.$host.':'.$server->port.$path;
     }
 
     public function createBrowser(BrowserType $type = BrowserType::Firefox, BrowserOptions|null $options = null, Origin|null $origin = null): BrowserSession
     {
-        return $this->browserRuntime->createBrowser($this->browserUri($origin), $type, $options);
+        return $this->browserRuntime->createBrowser(rtrim($this->uri(origin: $origin), '/'), $type, $options);
     }
 
     public function createBackendBrowser(BrowserType $type = BrowserType::Firefox, BrowserOptions|null $options = null, Origin|null $origin = null): BackendBrowser
@@ -197,28 +165,6 @@ final class ManagedEdition implements ApplicationInterface
         $this->server = null;
         $this->database()->close();
         $this->state->installation->lease->release();
-    }
-
-    private function registerOrigin(Origin $origin): string
-    {
-        $alias = 'contao-e2e-'.substr(hash('sha256', $origin->host."\0".(int) $origin->https), 0, 16);
-        $mapping = json_decode((string) file_get_contents($this->server->mappingFile), true, 512, JSON_THROW_ON_ERROR);
-        $mapping[$alias.'.localhost'] = ['host' => $origin->host, 'https' => $origin->https];
-        (new Filesystem())->dumpFile($this->server->mappingFile, json_encode($mapping, JSON_PRETTY_PRINT | JSON_THROW_ON_ERROR));
-
-        return $alias;
-    }
-
-    private function browserUri(Origin|null $origin): string
-    {
-        if ($origin) {
-            return $this->uri($origin);
-        }
-
-        $this->startServer();
-        $server = $this->server ?? throw new \LogicException('The E2E web server did not start.');
-
-        return 'http://localhost:'.$server->port;
     }
 
     private function clearMutableRuntime(): void

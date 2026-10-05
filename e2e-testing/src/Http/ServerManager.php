@@ -59,22 +59,6 @@ final readonly class ServerManager
 
     private function router(string $directory, string $mappingFile): string
     {
-        $mapping = var_export($mappingFile, true);
-
-        $prelude = <<<PHP
-            \$mapping = json_decode((string) file_get_contents($mapping), true, 512, JSON_THROW_ON_ERROR);
-            \$transportHost = explode(':', \$_SERVER['HTTP_HOST'] ?? '')[0];
-
-            if (isset(\$mapping[\$transportHost])) {
-                \$_SERVER['HTTP_HOST'] = \$mapping[\$transportHost]['host'];
-
-                if (\$mapping[\$transportHost]['https']) {
-                    \$_SERVER['HTTPS'] = 'on';
-                    \$_SERVER['SERVER_PORT'] = '443';
-                }
-            }
-            PHP;
-
-        return PhpRouter::generate(Path::join($directory, 'public/index.php'), $prelude);
+        return PhpRouter::generate(Path::join($directory, 'public/index.php'), (new OriginMap($mappingFile))->prelude());
     }
 }

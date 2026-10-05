@@ -12,7 +12,17 @@ $backend->visit('/contao/login');
 $backend->submitLogin('admin', 'password');
 ```
 
-For an existing Contao project, use `self::application()->createBackendBrowser()` instead. The helpers are the same.
+For an existing Contao project, wrap the generic browser explicitly. The helpers are the same:
+
+```php
+use Contao\E2eTesting\Browser\BackendBrowser;
+
+$backend = new BackendBrowser(self::application()->createBrowser());
+$backend->visit('/contao/login');
+$backend->submitLogin('admin', 'password');
+```
+
+`createBackendBrowser()` is a Contao-specific convenience on Managed Editions. General applications provide `createBrowser()`.
 
 ## Work with records and forms
 
