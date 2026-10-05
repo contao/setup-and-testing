@@ -1,60 +1,60 @@
 # Build a reusable recipe
 
-Use a recipe to describe reusable dependencies, Symfony configuration, database fixtures and project files. You can use a PHP recipe in tests or distribute an archive for an installer. Recipe creation does not require PHPUnit or a browser.
+Use a portable recipe to describe reusable dependencies, Symfony configuration, database fixtures and application files. A ZIP archive contains a YAML manifest and the files it references.
 
-## Prerequisites and installation
+## Create the archive source
 
-You need PHP 8.2 or newer, Composer and the ZIP extension. Run in the project that owns the recipe:
-
-```shell
-composer require contao/installation-recipe
-```
-
-## Create a PHP recipe for tests
-
-Use the following layout in that project:
+Use [the complete example-theme source](https://github.com/contao/setup-and-testing/tree/main/installation-recipe/examples/example-theme) as a starting point. Its layout is:
 
 ```text
-recipe.php
+recipe.yaml
+composer.json
 config/theme.yaml
 fixtures/pages.yaml
-assets/theme.css
+files/files/example-theme/theme.css
 ```
 
-Create `config/theme.yaml`:
+Define `recipe.yaml`:
 
 ```yaml
-framework:
-    default_locale: en
+format: 1
+name: acme/example-theme
+composer: composer.json
+config:
+    - config/theme.yaml
+fixtures:
+    - fixtures/pages.yaml
+files:
+    - source: files/files/example-theme
+      target: files/example-theme
+      overwrite: false
 ```
 
-Create `fixtures/pages.yaml`:
+The Composer fragment may only contain `require` and `require-dev`. Configuration fragments and fixtures use YAML. File mappings can install assets, DCA files, Symfony service configuration, templates and other application files, including PHP.
 
-```yaml
-tl_page:
-    example_root:
-        pid: 0
-        type: root
-        title: Example site
-        alias: example-site
-        published: true
-    example_page:
-        pid: '@example_root'
-        type: regular
-        title: Example page
-        alias: example-page
-        published: true
+## Package a portable recipe
+
+From the source directory, run:
+
+```shell
+zip -r example-theme.zip recipe.yaml composer.json config fixtures files
 ```
 
-Add your stylesheet at `assets/theme.css`. Put this in `recipe.php`:
+On Windows:
+
+```powershell
+Compress-Archive -Path recipe.yaml, composer.json, config, fixtures, files -DestinationPath example-theme.zip
+```
+
+Inspect the archive and confirm `recipe.yaml` is at its root. Include the manifest and its referenced files.
+
+An installer can open, review and apply the archive using [Apply a recipe](apply-recipe.md). Only install recipes from publishers you trust. Dependencies, configuration and fixture data can affect application behavior even though the manifest is declarative.
+
+## Use the object API in tests
+
+Local Managed Edition tests can construct an `InstallationRecipe` directly in their PHP test setup:
 
 ```php
-<?php
-
-declare(strict_types=1);
-
-require __DIR__.'/vendor/autoload.php';
-
 use Contao\InstallationRecipe\Composer\ComposerConfig;
 use Contao\InstallationRecipe\File\FileMapping;
 use Contao\InstallationRecipe\Recipe\InstallationRecipe;
@@ -63,34 +63,8 @@ $recipe = InstallationRecipe::create(ComposerConfig::managedEdition('^5.7'))
     ->withConfigFile(__DIR__.'/config/theme.yaml')
     ->withFixtureFile(__DIR__.'/fixtures/pages.yaml')
     ->withFileMapping(new FileMapping(__DIR__.'/assets', 'files/example-theme'));
-
-return $recipe;
 ```
 
-```shell
-php recipe.php
-```
-
-A successful run exits without output. The script constructs the recipe and checks that the referenced files exist. It does not install Contao or check that the configuration works in an application. A Managed Edition test can load it with `$recipe = require $root.'/recipe.php'` and pass it to `ManagedEditionConfig::create($recipe, $root)`.
-
-The fixture illustrates related pages. A complete renderable frontend may additionally need a theme, layout, articles and content. Add those according to the application being tested.
-
-## Package a portable recipe
-
-For distribution, author an [archive manifest](../recipes/archives.md) alongside Composer fragments, configuration, fixtures and files. This is a separate portable representation, not an automatic serialization of the PHP testing recipe.
-
-Use [the complete example-theme source](https://github.com/contao/setup-and-testing/tree/main/installation-recipe/examples/example-theme) as a starting point. Use a local copy of that source directory. From `installation-recipe/examples/example-theme/` in the monorepo, run:
-
-```shell
-zip -r example-theme.zip recipe.yaml composer.json config fixtures files
-```
-
-On Windows, from the same directory:
-
-```powershell
-Compress-Archive -Path recipe.yaml, composer.json, config, fixtures, files -DestinationPath example-theme.zip
-```
-
-Inspect the archive and confirm `recipe.yaml` is at its root. You now have an archive an installer can open and apply using [Apply a recipe](apply-recipe.md).
+Pass the object to `ManagedEditionConfig::create($recipe, $root)` in the test setup.
 
 Continue with [fixture references](../recipes/fixtures.md), [configuration and files](../recipes/configuration.md) and [the archive format](../recipes/archives.md).

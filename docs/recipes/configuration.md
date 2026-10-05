@@ -1,6 +1,6 @@
 # Dependencies, configuration and files
 
-A PHP recipe describes the Composer packages, configuration, fixtures and files for a Managed Edition. Build it in your test configuration or a separate recipe file. See [Build a reusable recipe](../guides/build-recipe.md) for a complete walkthrough.
+The `InstallationRecipe` object describes the Composer packages, configuration, fixtures and files for a Managed Edition. Construct it directly in your trusted test setup. See [Build a reusable recipe](../guides/build-recipe.md) for a complete walkthrough.
 
 ## Define the recipe
 
@@ -19,11 +19,11 @@ $recipe = InstallationRecipe::create($composer)
     ->withFileMapping(new FileMapping(__DIR__.'/files', 'files'));
 ```
 
-`InstallationRecipe` is the immutable PHP recipe used by Managed Edition tests. Its `with…()` methods return new recipes. Configuration fragments and fixture files must exist when the recipe is constructed.
+`InstallationRecipe` is the immutable configuration object used by Managed Edition tests. Its `with…()` methods return new recipes. Configuration fragments and fixture files must exist when the recipe is constructed.
 
 ## Copy files into the installation
 
-`FileMapping` maps an existing source file or directory to a relative destination inside the installation. Existing destination files are protected unless you explicitly enable `overwrite`. Absolute destinations and parent traversal are rejected.
+`FileMapping` maps an existing source file or directory to a relative destination inside the installation. Existing destination files are protected unless you explicitly enable `overwrite`. Absolute destinations and parent traversal are rejected. Destination symlinks are allowed when their resolved paths stay inside the installation and satisfy the host policy. Source directories must not contain symbolic links.
 
 ```php
 use Contao\InstallationRecipe\File\FileMapping;
@@ -37,4 +37,4 @@ $recipe = $recipe->withFileMapping(new FileMapping(
 
 In Managed Editions, files are copied as part of setup. Call `self::managedEdition()->synchronizeFiles('files/example-theme')` if a test needs those files registered in Contao's DBAFS, for example for a file-picker widget. Without a path, synchronization covers the configured filesystem.
 
-Portable archives use the separate `PortableInstallationRecipe` model returned by `RecipeArchive`. See [archive format](archives.md) and [installation behavior](installation.md).
+`RecipeArchive` loads portable archives as `PortableInstallationRecipe` objects. Their file mappings support application files, including PHP DCA and Symfony service configuration. The host controls allowed destinations, protected paths and overwrite permissions. See [the archive format](archives.md) and [installation behavior](installation.md).

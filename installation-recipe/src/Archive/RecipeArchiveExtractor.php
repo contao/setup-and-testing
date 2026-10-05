@@ -13,6 +13,7 @@ declare(strict_types=1);
 namespace Contao\InstallationRecipe\Archive;
 
 use Contao\InstallationRecipe\Exception\InvalidRecipeException;
+use Contao\InstallationRecipe\File\PortableFilePolicy;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\Filesystem\Path;
 
@@ -78,6 +79,7 @@ final readonly class RecipeArchiveExtractor
     private function assertEntry(\ZipArchive $archive, ArchiveEntry $entry, int $totalBytes): void
     {
         $name = $entry->name;
+        (new PortableFilePolicy())->assertArchivePath($name);
 
         if ('' === $name || str_contains($name, "\0") || str_contains($name, '\\')) {
             throw new InvalidRecipeException(\sprintf('The recipe archive entry "%s" has an unsafe path.', $name));

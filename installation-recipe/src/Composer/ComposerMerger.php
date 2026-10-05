@@ -13,16 +13,31 @@ declare(strict_types=1);
 namespace Contao\InstallationRecipe\Composer;
 
 use Contao\InstallationRecipe\Exception\InvalidRecipeException;
+use Contao\InstallationRecipe\File\InstallationPathValidator;
+use Contao\InstallationRecipe\File\PortableFilePolicy;
 use Symfony\Component\Filesystem\Filesystem;
+use Symfony\Component\Filesystem\Path;
 
 final readonly class ComposerMerger
 {
-    public function __construct(private Filesystem $filesystem = new Filesystem())
+    public function __construct(
+        private Filesystem $filesystem = new Filesystem(),
+        private PortableFilePolicy|null $policy = null,
+    ) {
+    }
+
+    public function withPolicy(PortableFilePolicy $policy): self
     {
+        return new self($this->filesystem, $policy);
     }
 
     public function merge(ComposerDependencies $dependencies, string $composerFile): ComposerMergeResult
     {
+        $paths = new InstallationPathValidator();
+        $directory = $paths->root(\dirname($composerFile));
+        $requested = basename($composerFile);
+        $composerFile = $paths->validate($directory, $requested);
+        $this->policy?->forInstallation($directory)->validateDocumentTarget($requested, Path::makeRelative($composerFile, $directory));
         $composer = $this->read($composerFile);
         $original = $composer;
         $requirements = $this->mergeSection($composer, 'require', $dependencies->requirements);

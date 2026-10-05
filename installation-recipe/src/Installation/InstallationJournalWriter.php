@@ -12,20 +12,32 @@ declare(strict_types=1);
 
 namespace Contao\InstallationRecipe\Installation;
 
+use Contao\InstallationRecipe\File\InstallationPathValidator;
+use Contao\InstallationRecipe\File\PortableFilePolicy;
 use Contao\InstallationRecipe\Recipe\PortableInstallationRecipe;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\Filesystem\Path;
 
 final readonly class InstallationJournalWriter
 {
-    public function __construct(private Filesystem $filesystem = new Filesystem())
+    public function __construct(
+        private Filesystem $filesystem = new Filesystem(),
+        private PortableFilePolicy|null $policy = null,
+    ) {
+    }
+
+    public function withPolicy(PortableFilePolicy $policy): self
     {
+        return new self($this->filesystem, $policy);
     }
 
     public function write(PortableInstallationRecipe $recipe, RecipeInstallationResult $result, string $targetDirectory): string
     {
         $name = str_replace('/', '--', $recipe->descriptor->name);
-        $path = Path::join($targetDirectory, '.contao-recipes', $name.'.json');
+        $paths = new InstallationPathValidator();
+        $requested = '.contao-recipes/'.$name.'.json';
+        $path = $paths->validate($targetDirectory, $requested);
+        $this->policy?->forInstallation($targetDirectory)->validateDocumentTarget($requested, Path::makeRelative($path, $paths->root($targetDirectory)));
         $data = [
             'format' => $recipe->descriptor->format,
             'name' => $recipe->descriptor->name,

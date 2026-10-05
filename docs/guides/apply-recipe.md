@@ -1,6 +1,6 @@
 # Apply a recipe
 
-Use this guide when an installer or importer needs to apply a portable recipe archive to an existing Contao project. The host owns dependency installation, migrations and the database connection. The recipe package owns reading and validating the archive and applying its contents.
+Use this guide when an installer or importer needs to apply a portable recipe archive to an existing Contao project. The host owns dependency installation, migrations and the database connection. The recipe package owns reading and validating the archive, preparing a read-only plan and applying the reviewed contents.
 
 ## Prerequisites
 
@@ -65,7 +65,16 @@ try {
 
     try {
         $target = new InstallationTarget(__DIR__, $connection, $runtime);
-        $result = (new RecipeInstaller())->install($archive->recipe, $target);
+        $installer = new RecipeInstaller();
+        $plan = $installer->plan($archive->recipe, $target);
+        echo json_encode($plan->changes, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR)."\n";
+        echo "Apply this recipe from its trusted publisher? Type yes: ";
+
+        if ('yes' !== trim((string) fgets(STDIN))) {
+            throw new RuntimeException('Recipe installation cancelled.');
+        }
+
+        $result = $installer->install($plan, $target);
         printf("Installed example page %s\n", $result->fixtures->value('example_page'));
     } finally {
         $archive->close();
@@ -92,6 +101,6 @@ $env:DATABASE_URL = 'mysql://user:password@127.0.0.1:3306/contao_test'
 php install-recipe.php
 ```
 
-For the example archive, the script prints the generated page identifier. Inspect the target's configuration, installed files and `.contao-recipes/` journal. The extracted archive directory is removed even if installation fails.
+The script first prints the proposed dependencies, configuration fragments, fixtures, file contents, destinations and overwrite flags. Review those changes and the publisher before typing `yes`. For the example archive, it then prints the generated page identifier. Inspect the target's configuration, installed files and `.contao-recipes/` journal. The extracted archive directory is removed even if installation fails.
 
 This operation modifies the target installation. Read [installation order and failure behavior](../recipes/installation.md) before applying a recipe to an existing project. Only the fixture import is transactional.

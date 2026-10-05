@@ -14,6 +14,7 @@ namespace Contao\InstallationRecipe\Tests;
 
 use Contao\InstallationRecipe\Archive\RecipeArchive;
 use Contao\InstallationRecipe\Exception\InvalidRecipeException;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Filesystem\Filesystem;
 
@@ -51,6 +52,35 @@ final class RecipeArchiveTest extends TestCase
         $directory = $archive->directory;
         $archive->close();
         $this->assertDirectoryDoesNotExist($directory);
+    }
+
+    #[DataProvider('phpRecipeFiles')]
+    public function testRejectsPhpRecipeEntrypointsEvenWhenUnreferenced(string $file): void
+    {
+        $path = $this->archive([
+            'recipe.yaml' => "format: 1\nname: acme/example\n",
+            $file => '<?php',
+        ]);
+        $this->expectException(InvalidRecipeException::class);
+        $this->expectExceptionMessage('root recipe.php');
+        RecipeArchive::open($path);
+    }
+
+    public static function phpRecipeFiles(): iterable
+    {
+        yield ['recipe.php'];
+        yield ['RECIPE.PHP'];
+    }
+
+    public function testLoadsMappingsWithoutImposingTheHostPolicy(): void
+    {
+        $path = $this->archive([
+            'recipe.yaml' => "format: 1\nname: acme/example\nfiles:\n  - source: style.css\n    target: vendor/style.css\n",
+            'style.css' => 'body {}',
+        ]);
+        $archive = RecipeArchive::open($path);
+        $this->assertSame('vendor/style.css', $archive->recipe->content->assets->fileMappings[0]->target);
+        $archive->close();
     }
 
     public function testRejectsArchivePathTraversal(): void
