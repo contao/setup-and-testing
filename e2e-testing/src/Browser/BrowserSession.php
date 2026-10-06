@@ -49,7 +49,7 @@ final class BrowserSession
             return $path;
         }
 
-        return rtrim($this->baseUri, '/').'/'.ltrim($path, '/');
+        return rtrim($this->baseUri, '/').(str_starts_with($path, '/') ? $path : '/'.$path);
     }
 
     public function close(): void

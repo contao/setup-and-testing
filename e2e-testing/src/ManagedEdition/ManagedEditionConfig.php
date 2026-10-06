@@ -81,6 +81,19 @@ final readonly class ManagedEditionConfig implements ApplicationConfigInterface
         return new self($this->recipe->withFileMapping($mapping), $this->environment, $this->resetMode, $this->appEnvironment);
     }
 
+    public function withSimulatedOrigins(): self
+    {
+        $path = \dirname(__DIR__, 2).'/config/simulated-origin.yaml';
+
+        foreach ($this->recipe->assets->configFragments as $fragment) {
+            if ($fragment->path === $path) {
+                return $this;
+            }
+        }
+
+        return new self($this->recipe->withConfigFile($path), $this->environment, $this->resetMode, $this->appEnvironment);
+    }
+
     public function withResetMode(DatabaseResetMode $resetMode): self
     {
         return new self($this->recipe, $this->environment, $resetMode, $this->appEnvironment);

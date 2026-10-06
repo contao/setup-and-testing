@@ -40,6 +40,11 @@ final readonly class HttpRequest
         return self::create($method, $path)->withHeader('Accept', 'application/json');
     }
 
+    public function withSimulatedOrigin(string $origin): self
+    {
+        return $this->withHeaders(SimulatedOrigin::fromUri($origin)->headers());
+    }
+
     public function withHeader(string $name, string $value): self
     {
         return $this->withHeaders([$name => $value]);

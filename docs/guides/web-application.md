@@ -139,7 +139,7 @@ $response = self::application()->send(
 );
 ```
 
-This keeps the connection pointed at the configured application URL. For domain-specific browser navigation or HTTPS, configure your test server and connect to its URL with `ApplicationConfig::create($url)`. See [page domains](../testing/frontend.md#test-a-page-domain) for BrowserKit requests with a custom `Host` header.
+This keeps the connection pointed at the configured application URL. If your application already trusts forwarded headers from the test connection, use `HttpRequest::get('/api/example')->withSimulatedOrigin('https://example.local')` or configure BrowserKit clients with `HttpBrowserOptions::create()->withSimulatedOrigin('https://example.local')`. Existing applications retain responsibility for that proxy configuration. Managed installations provide an opt-in [simulated origin setup](../testing/frontend.md#simulate-a-public-origin). For actual TLS or browser security on a particular domain, configure your test server and connect to its URL with `ApplicationConfig::create($url)`. See [page domains](../testing/frontend.md#test-a-page-domain) for BrowserKit requests with a custom `Host` header.
 
 ## Use this in a monorepo
 

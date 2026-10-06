@@ -12,13 +12,16 @@ declare(strict_types=1);
 
 namespace Contao\E2eTesting\Browser;
 
-final readonly class BrowserOptions
+final class BrowserOptions
 {
-    private function __construct(
-        public string|null $acceptLanguage = null,
-        public int|null $viewportWidth = null,
-        public int|null $viewportHeight = null,
-    ) {
+    private string|null $acceptLanguage = null;
+
+    private int|null $viewportWidth = null;
+
+    private int|null $viewportHeight = null;
+
+    private function __construct()
+    {
     }
 
     public static function create(): self
@@ -34,7 +37,10 @@ final readonly class BrowserOptions
             throw new \InvalidArgumentException('The accepted browser language must not be empty.');
         }
 
-        return new self($acceptLanguage, $this->viewportWidth, $this->viewportHeight);
+        $clone = clone $this;
+        $clone->acceptLanguage = $acceptLanguage;
+
+        return $clone;
     }
 
     public function withViewport(int $width, int $height): self
@@ -43,6 +49,25 @@ final readonly class BrowserOptions
             throw new \InvalidArgumentException('The browser viewport dimensions must be positive integers.');
         }
 
-        return new self($this->acceptLanguage, $width, $height);
+        $clone = clone $this;
+        $clone->viewportWidth = $width;
+        $clone->viewportHeight = $height;
+
+        return $clone;
+    }
+
+    public function acceptLanguage(): string|null
+    {
+        return $this->acceptLanguage;
+    }
+
+    public function viewportWidth(): int|null
+    {
+        return $this->viewportWidth;
+    }
+
+    public function viewportHeight(): int|null
+    {
+        return $this->viewportHeight;
     }
 }

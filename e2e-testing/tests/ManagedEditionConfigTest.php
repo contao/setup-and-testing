@@ -13,6 +13,7 @@ declare(strict_types=1);
 namespace Contao\E2eTesting\Tests;
 
 use Contao\E2eTesting\Cache\CacheConfig;
+use Contao\E2eTesting\Database\DatabaseResetMode;
 use Contao\E2eTesting\Database\DockerDatabaseConfig;
 use Contao\E2eTesting\Database\DockerDatabaseService;
 use Contao\E2eTesting\Installation\ApplicationPreparer;
@@ -21,6 +22,7 @@ use Contao\InstallationRecipe\Composer\ComposerConfig;
 use Contao\InstallationRecipe\Recipe\InstallationRecipe;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Filesystem\Filesystem;
+use Symfony\Component\Yaml\Yaml;
 
 final class ManagedEditionConfigTest extends TestCase
 {
@@ -72,6 +74,25 @@ final class ManagedEditionConfigTest extends TestCase
         $this->assertSame('prod', $prod->appEnvironment);
         $this->assertSame('dev', $dev->appEnvironment);
         $this->assertSame('dev', $dev->withDatabase(DockerDatabaseConfig::mysql('mysql:8.0'))->appEnvironment);
+    }
+
+    public function testSimulatedOriginsAreOptInAndUseOnlyLoopbackProxyHeaders(): void
+    {
+        $recipe = InstallationRecipe::create(ComposerConfig::managedEdition('^5.7'));
+        $original = ManagedEditionConfig::create($recipe, \dirname(__DIR__, 2));
+        $enabled = $original->withSimulatedOrigins()->withAppEnvironment('dev')->withResetMode(DatabaseResetMode::RECREATE_SCHEMA);
+        $this->assertSame([], $original->recipe->assets->configFragments);
+        $this->assertCount(1, $enabled->withSimulatedOrigins()->recipe->assets->configFragments);
+        $fragment = $enabled->recipe->assets->configFragments[0];
+        $this->assertSame(
+            [
+                'framework' => [
+                    'trusted_proxies' => ['127.0.0.1', '::1'],
+                    'trusted_headers' => ['x-forwarded-host', 'x-forwarded-proto', 'x-forwarded-port'],
+                ],
+            ],
+            Yaml::parseFile($fragment->path),
+        );
     }
 
     public function testAddsAProjectDcaFileToTheRecipe(): void

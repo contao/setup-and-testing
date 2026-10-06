@@ -68,6 +68,24 @@ final class FingerprintCalculatorTest extends TestCase
         }
     }
 
+    public function testSimulatedOriginsRefreshTheApplicationWithoutRebuildingDependencies(): void
+    {
+        $directory = $this->createInputDirectory();
+        $calculator = new FingerprintCalculator(new SourceFingerprint());
+
+        try {
+            $config = $this->config($directory);
+            $disabled = $calculator->calculate($config);
+            $enabled = $calculator->calculate($config->withSimulatedOrigins());
+            $this->assertSame($disabled->dependency, $enabled->dependency);
+            $this->assertNotSame($disabled->application, $enabled->application);
+            $this->assertNotSame($disabled->data, $enabled->data);
+            $this->assertSame($disabled->application, $calculator->calculate($config)->application);
+        } finally {
+            (new Filesystem())->remove($directory);
+        }
+    }
+
     public function testLinkedComposerDependenciesSelectAFreshInstallation(): void
     {
         $directory = $this->createInputDirectory();

@@ -21,14 +21,14 @@ final readonly class BrowserOptionsNormalizer
     {
         $normalized = [];
 
-        if (null !== $options->acceptLanguage) {
-            $normalized['extraHTTPHeaders'] = ['Accept-Language' => $options->acceptLanguage];
+        if (null !== $options->acceptLanguage()) {
+            $normalized['extraHTTPHeaders'] = ['Accept-Language' => $options->acceptLanguage()];
         }
 
-        if (null !== $options->viewportWidth && null !== $options->viewportHeight) {
+        if (null !== $options->viewportWidth() && null !== $options->viewportHeight()) {
             $normalized['viewport'] = [
-                'width' => $options->viewportWidth,
-                'height' => $options->viewportHeight,
+                'width' => $options->viewportWidth(),
+                'height' => $options->viewportHeight(),
             ];
         }
 
