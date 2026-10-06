@@ -12,6 +12,7 @@ declare(strict_types=1);
 
 namespace Contao\InstallationRecipe\Fixture;
 
+use Contao\InstallationRecipe\Cache\InMemoryCache;
 use Contao\InstallationRecipe\Exception\InvalidRecipeException;
 use Doctrine\DBAL\Connection;
 
@@ -20,7 +21,13 @@ final readonly class FixtureLoader
     public function __construct(
         private FixtureParser $parser,
         private FixtureValueResolver $valueResolver,
+        private InMemoryCache $cache,
     ) {
+    }
+
+    public function invalidateCache(Connection $connection): void
+    {
+        $this->cache->scope($connection)->clear();
     }
 
     public function load(Connection $connection, FixtureSet $fixtures): FixtureResult
@@ -36,7 +43,7 @@ final readonly class FixtureLoader
     private function insertDefinitions(Connection $connection, array $definitions): FixtureResult
     {
         $registry = new FixtureRegistry();
-        $context = new FixtureLoadContext($connection, $registry, new TableIdentityResolver($connection));
+        $context = new FixtureLoadContext($connection, $registry, new TableIdentityResolver($connection, $this->cache));
 
         while ([] !== $definitions) {
             [$definitions, $inserted] = $this->insertResolvable($context, $definitions);

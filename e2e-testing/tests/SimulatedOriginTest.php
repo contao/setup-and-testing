@@ -31,6 +31,7 @@ use Contao\E2eTesting\ManagedEdition\ManagedEditionConfig;
 use Contao\E2eTesting\ManagedEdition\ManagedEditionState;
 use Contao\E2eTesting\Process\ContaoConsole;
 use Contao\E2eTesting\Process\ProcessRunner;
+use Contao\InstallationRecipe\Cache\InMemoryCache;
 use Contao\InstallationRecipe\Composer\ComposerConfig;
 use Contao\InstallationRecipe\Fixture\FixtureLoader;
 use Contao\InstallationRecipe\Fixture\FixtureParser;
@@ -246,6 +247,8 @@ final class SimulatedOriginTest extends TestCase
 
     private function fixtureLoader(): FixtureLoader
     {
-        return new FixtureLoader(new FixtureParser(), new FixtureValueResolver());
+        $cache = new InMemoryCache();
+
+        return new FixtureLoader(new FixtureParser($cache), new FixtureValueResolver(), $cache);
     }
 }

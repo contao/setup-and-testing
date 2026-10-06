@@ -23,6 +23,7 @@ use Contao\E2eTesting\Installation\InstallationWorkspace;
 use Contao\E2eTesting\ManagedEdition\ManagedEditionConfig;
 use Contao\E2eTesting\Process\ContaoConsole;
 use Contao\E2eTesting\Process\ProcessRunnerInterface;
+use Contao\InstallationRecipe\Cache\InMemoryCache;
 use Contao\InstallationRecipe\Composer\ComposerConfig;
 use Contao\InstallationRecipe\File\FileMapping;
 use Contao\InstallationRecipe\Fixture\FixtureResult;
@@ -100,6 +101,56 @@ final class InstallationBuilderTest extends TestCase
         $this->assertSame(['help', 'migrate'], $this->commands);
         $this->assertSame('cached dependencies', file_get_contents($installation->directory.'/vendor/installed.txt'));
         $this->assertSame('cached application', file_get_contents($installation->directory.'/templates/new.txt'));
+    }
+
+    public function testMigrationInvalidatesItsCacheBeforeChangingTheSchema(): void
+    {
+        $database = $this->createMock(InstallationDatabaseInterface::class);
+        $database
+            ->method('hasSchema')
+            ->willReturn(false)
+        ;
+
+        $database
+            ->expects($this->once())
+            ->method('reset')
+            ->willReturn(new FixtureResult([]))
+        ;
+        $shared = new InMemoryCache();
+        $shared->set('unrelated', 'kept');
+
+        $cache = $shared->scope($database);
+        $cache->set('metadata', 'stale');
+        $database
+            ->method('applicationUrl')
+            ->willReturnCallback(
+                function () use ($cache): string {
+                    $this->assertFalse($cache->has('metadata'));
+
+                    return 'mysql://localhost/builder-test';
+                },
+            )
+        ;
+        $installation = $this->installation();
+        $this->cache($installation);
+        $this->builder($cache)->prepare($this->config, $installation, $database);
+
+        $this->assertSame(['help', 'migrate'], $this->commands);
+        $this->assertSame('kept', $shared->get('unrelated'));
+    }
+
+    public function testWarmFixtureResetKeepsItsCache(): void
+    {
+        $database = $this->database();
+        $cache = new InMemoryCache();
+        $cache->set('metadata', 'cached');
+
+        $installation = $this->installation();
+        $this->cache($installation);
+        $this->builder($cache)->prepare($this->config, $installation, $database);
+
+        $this->assertSame('cached', $cache->get('metadata'));
+        $this->assertSame([], $this->commands);
     }
 
     public function testApplicationChangesReplaceRecipeFilesAndKeepDependencies(): void
@@ -227,7 +278,7 @@ final class InstallationBuilderTest extends TestCase
         ;
     }
 
-    private function builder(): InstallationBuilder
+    private function builder(InMemoryCache $cache = new InMemoryCache()): InstallationBuilder
     {
         $runner = $this->createStub(ProcessRunnerInterface::class);
         $runner
@@ -235,7 +286,7 @@ final class InstallationBuilderTest extends TestCase
             ->willReturnCallback($this->runCommand(...))
         ;
 
-        return new InstallationBuilder(new ComposerInstaller($runner), new ApplicationPreparer(), new ContaoConsole($runner));
+        return new InstallationBuilder(new ComposerInstaller($runner), new ApplicationPreparer(), new ContaoConsole($runner), $cache);
     }
 
     /**

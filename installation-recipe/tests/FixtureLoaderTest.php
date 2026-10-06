@@ -12,6 +12,7 @@ declare(strict_types=1);
 
 namespace Contao\InstallationRecipe\Tests;
 
+use Contao\InstallationRecipe\Cache\InMemoryCache;
 use Contao\InstallationRecipe\Exception\InvalidRecipeException;
 use Contao\InstallationRecipe\Fixture\FixtureLoader;
 use Contao\InstallationRecipe\Fixture\FixtureParser;
@@ -226,6 +227,52 @@ final class FixtureLoaderTest extends TestCase
         $this->fixtureLoader()->load(DriverManager::getConnection(['driver' => 'pdo_sqlite', 'memory' => true]), new FixtureSet([$fixture]));
     }
 
+    public function testRepeatedLoadsResolveFreshIdentitiesAndStructuredReferences(): void
+    {
+        $file = $this->fixture(<<<'YAML'
+            example:
+              child:
+                parent_id: '@parent'
+                options: !json {parent: '@parent', literal: '\@literal'}
+                related: ['@parent']
+              parent:
+                parent_id: 0
+                options: !json {}
+                related: []
+            YAML);
+        $connection = DriverManager::getConnection(['driver' => 'pdo_sqlite', 'memory' => true]);
+        $connection->executeStatement('CREATE TABLE example (id INTEGER PRIMARY KEY AUTOINCREMENT, parent_id INTEGER, options TEXT, related TEXT)');
+
+        $loader = $this->fixtureLoader();
+        $fixtures = new FixtureSet([$file]);
+
+        foreach ([1, 3] as $expectedParent) {
+            $result = $loader->load($connection, $fixtures);
+            $this->assertSame($expectedParent, (int) $result->value('parent'));
+            $row = $connection->fetchAssociative('SELECT * FROM example WHERE id = ?', [$result->value('child')]);
+            $this->assertIsArray($row);
+            $this->assertSame($expectedParent, (int) $row['parent_id']);
+            $this->assertSame(['parent' => (string) $expectedParent, 'literal' => '@literal'], json_decode($row['options'], true));
+            $this->assertSame([(string) $expectedParent], unserialize($row['related']));
+        }
+    }
+
+    public function testExplicitSchemaInvalidationRefreshesTheIdentityColumn(): void
+    {
+        $file = $this->fixture("example:\n  row: {title: Example}\n");
+        $fixtures = new FixtureSet([$file]);
+        $loader = $this->fixtureLoader();
+        $connection = DriverManager::getConnection(['driver' => 'pdo_sqlite', 'memory' => true]);
+        $connection->executeStatement('CREATE TABLE example (old_id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT)');
+        $this->assertSame('1', $loader->load($connection, $fixtures)->value('row', 'old_id'));
+        $connection->executeStatement('DROP TABLE example');
+        $connection->executeStatement('CREATE TABLE example (new_id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT)');
+
+        $loader->invalidateCache($connection);
+
+        $this->assertSame('1', $loader->load($connection, $fixtures)->value('row', 'new_id'));
+    }
+
     private function fixture(string $contents): string
     {
         $directory = \dirname(__DIR__, 2).'/.contao-e2e/runtime/unit-tests';
@@ -240,6 +287,8 @@ final class FixtureLoaderTest extends TestCase
 
     private function fixtureLoader(): FixtureLoader
     {
-        return new FixtureLoader(new FixtureParser(), new FixtureValueResolver());
+        $cache = new InMemoryCache();
+
+        return new FixtureLoader(new FixtureParser($cache), new FixtureValueResolver(), $cache);
     }
 }

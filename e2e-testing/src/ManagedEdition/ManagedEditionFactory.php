@@ -26,6 +26,7 @@ use Contao\E2eTesting\Installation\InstallationWorkspace;
 use Contao\E2eTesting\Installation\PreparedInstallation;
 use Contao\E2eTesting\Process\ContaoConsole;
 use Contao\E2eTesting\Process\ProcessRunner;
+use Contao\InstallationRecipe\Cache\InMemoryCache;
 use Contao\InstallationRecipe\Fixture\FixtureLoader;
 use Contao\InstallationRecipe\Fixture\FixtureParser;
 use Contao\InstallationRecipe\Fixture\FixtureValueResolver;
@@ -37,6 +38,7 @@ final readonly class ManagedEditionFactory
         private ManagedEditionRuntime $runtime,
         private FingerprintCalculator $fingerprintCalculator,
         private InstallationPool $installationPool,
+        private InMemoryCache $cache,
     ) {
     }
 
@@ -61,6 +63,7 @@ final readonly class ManagedEditionFactory
             new ComposerInstaller($processRunner),
             new ApplicationPreparer(),
             $console,
+            $this->cache->scope($database->connection()),
         );
 
         try {
@@ -81,7 +84,8 @@ final readonly class ManagedEditionFactory
 
     private function createDatabase(DatabaseServerConfig $server, string $name): DatabaseManager
     {
-        $fixtures = new FixtureLoader(new FixtureParser(), new FixtureValueResolver());
+        $cache = $this->cache;
+        $fixtures = new FixtureLoader(new FixtureParser($cache), new FixtureValueResolver(), $cache);
 
         return new DatabaseManager($server, $name, $fixtures);
     }

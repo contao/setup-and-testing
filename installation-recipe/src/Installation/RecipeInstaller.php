@@ -51,6 +51,7 @@ final readonly class RecipeInstaller
             $target->runtime->installDependencies($target->directory);
         }
 
+        $this->content->fixtures->invalidateCache($target->connection);
         $target->runtime->migrate($target->directory);
         $fixtures = $this->content->fixtures->load($target->connection, $recipe->content->fixtures);
         $this->content->files->withPolicy($this->planner->filePolicy())->install($assets->fileMappings, $target->directory);

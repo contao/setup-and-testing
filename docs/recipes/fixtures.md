@@ -46,3 +46,15 @@ $url = $result->interpolate('/pages/{regular}/{regular->alias}');
 ```
 
 In a Managed Edition test, `resetDatabase()` also returns a `FixtureResult`. After applying an archive, read the result through `$result->fixtures`, as shown in [Apply a recipe](../guides/apply-recipe.md).
+
+## Cache invalidation
+
+Parsed fixtures are cached by content, so file changes are picked up automatically. Table identities are cached per live database connection. When changing its database or schema, invalidate the connection's cached values before loading fixtures again:
+
+```php
+$loader->invalidateCache($connection);
+// Apply schema changes before loading fixtures again.
+$loader->load($connection, $fixtures);
+```
+
+Recipe installation and managed e2e migrations and database recreation handle this automatically.

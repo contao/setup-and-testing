@@ -12,6 +12,7 @@ declare(strict_types=1);
 
 namespace Contao\InstallationRecipe\Installation;
 
+use Contao\InstallationRecipe\Cache\InMemoryCache;
 use Contao\InstallationRecipe\File\FileInstaller;
 use Contao\InstallationRecipe\File\InstallationPathValidator;
 use Contao\InstallationRecipe\File\PortableFilePolicy;
@@ -23,8 +24,9 @@ final class RecipeInstallerFactory
 {
     public function create(PortableFilePolicy|null $policy = null): RecipeInstaller
     {
-        $parser = new FixtureParser();
-        $fixtures = new FixtureLoader($parser, new FixtureValueResolver());
+        $cache = new InMemoryCache();
+        $parser = new FixtureParser($cache);
+        $fixtures = new FixtureLoader($parser, new FixtureValueResolver(), $cache);
 
         return new RecipeInstaller(
             new InstallationDocumentInstallers(),

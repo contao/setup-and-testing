@@ -12,6 +12,7 @@ declare(strict_types=1);
 
 namespace Contao\InstallationRecipe\Fixture;
 
+use Contao\InstallationRecipe\Cache\InMemoryCache;
 use Contao\InstallationRecipe\Exception\InvalidRecipeException;
 use Symfony\Component\Yaml\Tag\TaggedValue;
 use Symfony\Component\Yaml\Yaml;
@@ -22,6 +23,10 @@ final class FixtureParser
      * @var array<string, true>
      */
     private array $names = [];
+
+    public function __construct(private readonly InMemoryCache $cache)
+    {
+    }
 
     /**
      * @return list<FixtureDefinition>
@@ -43,7 +48,7 @@ final class FixtureParser
      */
     private function parseFile(string $file): array
     {
-        $tables = Yaml::parseFile($file, Yaml::PARSE_CUSTOM_TAGS);
+        $tables = $this->parseYaml($file);
 
         if (!\is_array($tables)) {
             throw new InvalidRecipeException(\sprintf('The fixture file "%s" must contain a table mapping.', $file));
@@ -56,6 +61,29 @@ final class FixtureParser
         }
 
         return $definitions;
+    }
+
+    private function parseYaml(string $file): mixed
+    {
+        if (!is_file($file) || !is_readable($file)) {
+            return Yaml::parseFile($file, Yaml::PARSE_CUSTOM_TAGS);
+        }
+
+        $fingerprint = hash_file('sha256', $file);
+        $key = 'fixture.yaml:'.$fingerprint;
+
+        if (false !== $fingerprint && $this->cache->has($key)) {
+            return $this->cache->get($key);
+        }
+
+        $tables = Yaml::parseFile($file, Yaml::PARSE_CUSTOM_TAGS);
+
+        // Cache only when the file stayed unchanged while YAML was parsed.
+        if (false !== $fingerprint && hash_file('sha256', $file) === $fingerprint) {
+            $this->cache->set($key, $tables);
+        }
+
+        return $tables;
     }
 
     /**

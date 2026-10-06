@@ -16,6 +16,7 @@ use Contao\E2eTesting\Composer\ComposerInstaller;
 use Contao\E2eTesting\Database\InstallationDatabaseInterface;
 use Contao\E2eTesting\ManagedEdition\ManagedEditionConfig;
 use Contao\E2eTesting\Process\ContaoConsole;
+use Contao\InstallationRecipe\Cache\InMemoryCache;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\Filesystem\Path;
 
@@ -25,6 +26,7 @@ final readonly class InstallationBuilder
         private ComposerInstaller $composerInstaller,
         private ApplicationPreparer $applicationPreparer,
         private ContaoConsole $contaoConsole,
+        private InMemoryCache $cache,
     ) {
     }
 
@@ -49,6 +51,7 @@ final readonly class InstallationBuilder
         }
 
         if ($applicationChanged || !$database->hasSchema()) {
+            $this->cache->clear();
             $this->contaoConsole->migrate($directory, $database->applicationUrl());
         }
 

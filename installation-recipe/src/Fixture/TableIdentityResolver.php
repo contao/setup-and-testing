@@ -12,18 +12,16 @@ declare(strict_types=1);
 
 namespace Contao\InstallationRecipe\Fixture;
 
+use Contao\InstallationRecipe\Cache\InMemoryCache;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\Schema\Column;
 
-final class TableIdentityResolver
+final readonly class TableIdentityResolver
 {
-    /**
-     * @var array<string, string|null>
-     */
-    private array $identityColumns = [];
-
-    public function __construct(private readonly Connection $connection)
-    {
+    public function __construct(
+        private Connection $connection,
+        private InMemoryCache $cache,
+    ) {
     }
 
     public function prepare(FixtureDefinition $definition): void
@@ -47,13 +45,20 @@ final class TableIdentityResolver
 
     private function identityColumn(string $tableName): string|null
     {
-        if (\array_key_exists($tableName, $this->identityColumns)) {
-            return $this->identityColumns[$tableName];
+        $cache = $this->cache->scope($this->connection);
+        $key = 'fixture.identity:'.$tableName;
+
+        if ($cache->has($key)) {
+            $column = $cache->get($key);
+
+            return \is_string($column) ? $column : null;
         }
 
         $columns = $this->connection->createSchemaManager()->listTableColumns($tableName);
+        $column = $this->findIdentityColumn($columns);
+        $cache->set($key, $column);
 
-        return $this->identityColumns[$tableName] = $this->findIdentityColumn($columns);
+        return $column;
     }
 
     /**

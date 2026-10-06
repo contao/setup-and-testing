@@ -56,6 +56,10 @@ final class DatabaseManager implements InstallationDatabaseInterface
 
     public function recreate(): void
     {
+        if ($this->connection) {
+            $this->fixtureLoader->invalidateCache($this->connection);
+        }
+
         $this->close();
         $connection = DriverManager::getConnection($this->connectionParameters($this->config->url));
         $database = $connection->getDatabasePlatform()->quoteSingleIdentifier($this->databaseName);

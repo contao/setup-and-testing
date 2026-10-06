@@ -22,6 +22,7 @@ use Contao\E2eTesting\Database\DockerDatabaseConfig;
 use Contao\E2eTesting\Database\DockerDatabaseService;
 use Contao\E2eTesting\Docker\DockerServiceInterface;
 use Contao\E2eTesting\Installation\InstallationPool;
+use Contao\InstallationRecipe\Cache\InMemoryCache;
 use Contao\InstallationRecipe\File\FileMapping;
 use Contao\InstallationRecipe\Recipe\InstallationRecipe;
 
@@ -49,6 +50,7 @@ final readonly class ManagedEditionConfig implements ApplicationConfigInterface
             new ManagedEditionRuntime(),
             new FingerprintCalculator(new ProcessCachedSourceFingerprint()),
             new InstallationPool(),
+            new InMemoryCache(),
         );
 
         return $factory->create($this)->startServer();
