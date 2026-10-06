@@ -46,6 +46,52 @@ $this->assertSame('Example', trim($crawler->filterXPath('//head/title')->text())
 
 For a general application, use `self::application()` with the same methods. All requests use the configured application URL.
 
+## Simulate a public origin
+
+Use this for HTTP and BrowserKit tests that depend on domain-based routing, HTTPS detection or generated absolute URLs while the application runs on a local HTTP server.
+
+Enable simulated origins on the managed configuration, usually in your [shared test base class](phpunit.md#enable-simulated-origins-in-a-shared-base-class):
+
+```php
+$config = ManagedEditionConfig::create($recipe, $projectRoot)->withSimulatedOrigins();
+```
+
+This opt-in adds a bundled Symfony configuration fragment to the isolated installation. It trusts only loopback proxies (`127.0.0.1` and `::1`) and the forwarded host, scheme and port headers. Enabling it refreshes cached application configuration without rebuilding Composer dependencies. It is disabled by default.
+
+Choose the public origin independently for each request:
+
+```php
+use Contao\E2eTesting\Http\HttpRequest;
+
+$response = self::managedEdition()->send(
+    HttpRequest::json('POST', '/api/example')
+        ->withSimulatedOrigin('https://example.local')
+        ->withJson(['title' => 'Example']),
+);
+```
+
+Use the same origin format for a BrowserKit client:
+
+```php
+use Contao\E2eTesting\Http\HttpBrowserOptions;
+
+$options = HttpBrowserOptions::create()->withSimulatedOrigin('https://example.local');
+$browser = self::managedEdition()->createHttpBrowser($options);
+$browser->request('GET', '//');
+```
+
+Options are immutable and can be reused across clients. Every `with…()` method returns a clone, so changing an origin leaves existing options and clients unchanged.
+
+The helpers construct `X-Forwarded-Host`, `X-Forwarded-Proto` and `X-Forwarded-Port`. Symfony sees the requested public origin while the connection continues to use the local HTTP server. Origins accept HTTP or HTTPS, a hostname and an optional port, for example `https://example.local:8443`. Paths, credentials, queries and fragments do not belong in the origin. Request paths, including `//`, are preserved.
+
+HTTP requests and BrowserKit leave redirects unfollowed by default, so you can assert the public `Location` URL. Calling BrowserKit's `followRedirect()` maps absolute and protocol-relative URLs for that simulated origin back to the local server and preserves their paths and queries. Forwarded headers are scoped to the configured server and are not sent when the client navigates to another server.
+
+Requests and clients without a simulated origin keep using the ordinary application URL. This simulates the origin seen by Symfony while the connection uses the application’s actual transport. The HTTP `Origin` header remains a normal request header that you can set with `withHeader()`.
+
+Playwright uses the application's actual URL for navigation, cookies and cross-origin rules. Tests that need a particular domain or HTTPS in a real browser should configure their test server accordingly and connect through `ApplicationConfig::create($url)`.
+
+The helpers are also available on existing applications. Those applications must supply their own trusted proxy configuration. The framework never installs configuration into an external application. See [Symfony's trusted proxy configuration](https://symfony.com/doc/current/deployment/proxies.html) for how forwarded headers are interpreted.
+
 ## Test a page domain
 
 For HTTP tests that need a particular Contao page domain, send the `Host` header:

@@ -35,6 +35,29 @@ For tests that start a local server, return a `LocalApplicationConfig` instead. 
 
 Use `ManagedEditionTestTrait` and return a `ManagedEditionConfig` from `createApplicationConfig()`. The trait adds `self::managedEdition()` for database, server and Contao operations. See [Databases](databases.md) for the complete trait example and optional Docker service provider.
 
+## Enable simulated origins in a shared base class
+
+Enable the capability once in the managed configuration used by your shared base class. Individual tests can then choose different public origins for their HTTP requests and BrowserKit clients:
+
+```php
+use Contao\E2eTesting\ManagedEdition\AbstractManagedEditionTestCase;
+use Contao\E2eTesting\ManagedEdition\ManagedEditionConfig;
+use Contao\InstallationRecipe\Recipe\InstallationRecipe;
+
+abstract class AbstractProjectTestCase extends AbstractManagedEditionTestCase
+{
+    abstract protected static function createRecipe(): InstallationRecipe;
+
+    protected static function createApplicationConfig(): ManagedEditionConfig
+    {
+        return ManagedEditionConfig::create(static::createRecipe(), dirname(__DIR__))
+            ->withSimulatedOrigins();
+    }
+}
+```
+
+Adjust the project root for your test directory. No proxy fixture is needed. Tests select origins independently with `HttpRequest::withSimulatedOrigin()` or `HttpBrowserOptions::withSimulatedOrigin()`. See [simulated public origins](frontend.md#simulate-a-public-origin) for requests, redirects and the scope of the generated configuration.
+
 ## Choose Contao's environment
 
 Managed Editions use `prod` by default. Return a configuration with `withAppEnvironment('dev')` when your tests need Contao's development behavior:

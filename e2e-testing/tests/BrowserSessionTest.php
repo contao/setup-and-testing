@@ -27,6 +27,7 @@ class BrowserSessionTest extends TestCase
         $browser = new BrowserSession('http://localhost:8000/', $context, $page);
 
         $this->assertSame('http://localhost:8000/contao/login', $browser->uri('/contao/login'));
+        $this->assertSame('http://localhost:8000//?test=1', $browser->uri('//?test=1'));
         $this->assertSame('https://example.com/path', $browser->uri('https://example.com/path'));
     }
 

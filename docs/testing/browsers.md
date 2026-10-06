@@ -38,3 +38,19 @@ $backend = self::managedEdition()->createBackendBrowser(options: $options);
 ```
 
 See [Contao backend interactions](backend.md), [Playwright options](../running/playwright.md) and [traces](../running/traces.md) for more control.
+
+## Configure browser options
+
+`BrowserOptions` configures accepted languages and viewport dimensions for `createBrowser()` and `createBackendBrowser()`:
+
+```php
+$options = BrowserOptions::create()
+    ->withAcceptLanguage('de-CH')
+    ->withViewport(1440, 1200);
+
+$browser = self::managedEdition()->createBrowser(options: $options);
+```
+
+Read configured values with `acceptLanguage()`, `viewportWidth()` and `viewportHeight()`. Every `with…()` method returns a clone.
+
+For application-side origin simulation in BrowserKit, pass `HttpBrowserOptions::create()->withSimulatedOrigin('https://example.local')` to `createHttpBrowser()`. See [simulated public origins](frontend.md#simulate-a-public-origin) for setup. Playwright uses the configured application URL. To test a particular domain or HTTPS in a real browser, configure the test server and connect through `ApplicationConfig::create($url)`.

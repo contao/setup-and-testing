@@ -13,9 +13,12 @@ declare(strict_types=1);
 namespace Contao\E2eTesting\Application;
 
 use Contao\E2eTesting\Http\ApplicationHttpBrowser;
+use Contao\E2eTesting\Http\HttpBrowserOptions;
 use Contao\E2eTesting\Http\HttpRequest;
+use Contao\E2eTesting\Http\SimulatedOrigin;
 use Symfony\Component\BrowserKit\HttpBrowser;
 use Symfony\Component\HttpClient\HttpClient;
+use Symfony\Component\HttpClient\ScopingHttpClient;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 use Symfony\Contracts\HttpClient\ResponseInterface;
 
@@ -32,7 +35,7 @@ trait HttpApplicationTrait
         );
     }
 
-    public function createHttpBrowser(): HttpBrowser
+    public function createHttpBrowser(HttpBrowserOptions|null $options = null): HttpBrowser
     {
         $uri = $this->uri();
         $host = parse_url((string) $uri, PHP_URL_HOST);
@@ -44,26 +47,26 @@ trait HttpApplicationTrait
 
         $host .= \is_int($port) ? ':'.$port : '';
         $baseUri = parse_url((string) $uri, PHP_URL_SCHEME).'://'.$host.'/';
-        $browser = new ApplicationHttpBrowser($baseUri, $this->createHttpBrowserClient($uri, $host));
+        $origin = $options?->simulatedOrigin();
+        $browser = new ApplicationHttpBrowser($baseUri, $this->createHttpBrowserClient($uri, $host, $origin), $origin);
         $browser->followRedirects(false);
 
         return $browser;
     }
 
-    private function createHttpBrowserClient(string $uri, string $host): HttpClientInterface
+    private function createHttpBrowserClient(string $uri, string $host, SimulatedOrigin|null $origin): HttpClientInterface
     {
         $user = parse_url($uri, PHP_URL_USER);
 
-        if (!\is_string($user)) {
-            return HttpClient::create(['max_redirects' => 0]);
+        $options = ['headers' => $origin?->headers() ?? []];
+        if (\is_string($user)) {
+            $options['auth_basic'] = [rawurldecode($user), rawurldecode((string) parse_url($uri, PHP_URL_PASS))];
         }
 
-        return HttpClient::createForBaseUri(
+        return ScopingHttpClient::forBaseUri(
+            HttpClient::create(['max_redirects' => 0]),
             parse_url($uri, PHP_URL_SCHEME).'://'.$host.'/',
-            [
-                'max_redirects' => 0,
-                'auth_basic' => [rawurldecode($user), rawurldecode((string) parse_url($uri, PHP_URL_PASS))],
-            ],
+            $options,
         );
     }
 }
