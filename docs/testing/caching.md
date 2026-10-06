@@ -13,7 +13,7 @@ Managed Edition tests reuse installations to make later runs faster. Each projec
 
 Parallel processes use separate installation and database slots. Source fingerprints are cached for the application runtime. Tests that change source during a run can call `$application->runtime()->cache->clear()` before recalculating them.
 
-The Playwright process and browser engine are reused within each test class in both modes. Browser contexts have independent cookies and storage and are closed between tests. See [browsers and assertions](browsers.md).
+The shared application runtime reuses its Playwright process and browser engines across test classes in both modes. Browser contexts have independent cookies and storage and are closed between tests. Disconnected browsers are replaced when another session is requested. To bound closed-context retention in Playwright PHP, the runtime recycles its client and browsers after 50 contexts once all sessions are closed. See [browsers and assertions](browsers.md).
 
 ## Share an in-memory cache
 
@@ -29,7 +29,7 @@ $second = $runtime->createApplication(ApplicationConfig::create('http://localhos
 $runtime->cache->set('custom.value', 'shared');
 ```
 
-This works with all application configurations, including Managed Edition and local servers. The cache survives application resets and release while the runtime remains in use. Call `$runtime->cache->clear()` to clear its values. Database migrations invalidate only their connection scope, leaving parsed fixtures and source fingerprints available to other applications. Separate runtimes have separate caches.
+This works with all application configurations, including Managed Edition and local servers. The cache survives application resets and release while the runtime remains in use. Call `$runtime->cache->clear()` to clear its values. Database migrations invalidate only their connection scope, leaving parsed fixtures and source fingerprints available to other applications. Separate runtimes have separate caches and browser processes. Releasing an application closes its contexts. Call `$runtime->close()` after releasing its applications to stop the browser processes, or let runtime destruction close them. The shared PHPUnit runtime stays alive until the process exits.
 
 ## Restore database fixtures
 

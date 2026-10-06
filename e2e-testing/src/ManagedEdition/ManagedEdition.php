@@ -160,11 +160,33 @@ final class ManagedEdition implements ApplicationInterface
 
     public function release(): void
     {
-        $this->browserRuntime->close();
-        $this->server?->stop();
-        $this->server = null;
-        $this->database()->close();
-        $this->state->installation->lease->release();
+        try {
+            $this->browserRuntime->reset();
+        } finally {
+            try {
+                $this->releaseServer();
+            } finally {
+                $this->releaseInstallation();
+            }
+        }
+    }
+
+    private function releaseServer(): void
+    {
+        try {
+            $this->server?->stop();
+        } finally {
+            $this->server = null;
+        }
+    }
+
+    private function releaseInstallation(): void
+    {
+        try {
+            $this->database()->close();
+        } finally {
+            $this->state->installation->lease->release();
+        }
     }
 
     private function hasPreparedFixtures(): bool

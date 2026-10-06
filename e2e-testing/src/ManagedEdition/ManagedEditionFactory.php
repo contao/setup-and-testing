@@ -13,8 +13,6 @@ declare(strict_types=1);
 namespace Contao\E2eTesting\ManagedEdition;
 
 use Contao\E2eTesting\Application\ApplicationRuntime;
-use Contao\E2eTesting\Browser\BrowserRuntime;
-use Contao\E2eTesting\Browser\PlaywrightManager;
 use Contao\E2eTesting\Cache\FingerprintCalculator;
 use Contao\E2eTesting\Composer\ComposerInstaller;
 use Contao\E2eTesting\Database\DatabaseManager;
@@ -78,7 +76,7 @@ final readonly class ManagedEditionFactory
         return new ManagedEdition(
             new ManagedEditionState($installation, $config, $console),
             new ServerManager(appEnvironment: $config->appEnvironment),
-            new BrowserRuntime(Path::join($cache->rootDirectory, 'traces'), new PlaywrightManager()),
+            $this->applicationRuntime->createBrowserRuntime(Path::join($cache->rootDirectory, 'traces')),
             $this->applicationRuntime,
         );
     }

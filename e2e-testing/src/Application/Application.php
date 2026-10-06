@@ -62,7 +62,7 @@ final class Application implements ApplicationInterface
     public function release(): void
     {
         try {
-            $this->browserRuntime->close();
+            $this->browserRuntime->reset();
         } finally {
             $this->server?->stop();
         }

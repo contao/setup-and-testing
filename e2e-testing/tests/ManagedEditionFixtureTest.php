@@ -14,7 +14,8 @@ namespace Contao\E2eTesting\Tests;
 
 use Contao\E2eTesting\Application\ApplicationRuntime;
 use Contao\E2eTesting\Browser\BrowserRuntime;
-use Contao\E2eTesting\Browser\PlaywrightManager;
+use Contao\E2eTesting\Browser\BrowserSession;
+use Contao\E2eTesting\Browser\BrowserSessionFactoryInterface;
 use Contao\E2eTesting\Cache\FingerprintSet;
 use Contao\E2eTesting\Database\DatabaseManager;
 use Contao\E2eTesting\Database\DatabaseServerConfig;
@@ -38,6 +39,8 @@ use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\DriverManager;
 use PHPUnit\Framework\MockObject\Stub;
 use PHPUnit\Framework\TestCase;
+use Playwright\Browser\BrowserContextInterface;
+use Playwright\Page\PageInterface;
 use Symfony\Component\Filesystem\Filesystem;
 
 final class ManagedEditionFixtureTest extends TestCase
@@ -65,6 +68,43 @@ final class ManagedEditionFixtureTest extends TestCase
     {
         $this->application->release();
         (new Filesystem())->remove($this->directory);
+    }
+
+    public function testReleaseClosesDatabaseAndLeaseWhenContextCleanupFails(): void
+    {
+        $lock = fopen($this->directory.'/lease.lock', 'c+');
+        $this->assertIsResource($lock);
+        $installation = new PreparedInstallation(new InstallationLease($this->directory.'/installation', 0, $lock), $this->database, new FingerprintSet('fixtures', 'fixtures', 'fixtures'));
+        $context = $this->createStub(BrowserContextInterface::class);
+        $failure = new \RuntimeException('Context cleanup failed');
+        $context
+            ->method('close')
+            ->willThrowException($failure)
+        ;
+        $factory = $this->createStub(BrowserSessionFactoryInterface::class);
+        $factory
+            ->method('create')
+            ->willReturn(new BrowserSession('https://example.test', $context, $this->createStub(PageInterface::class)))
+        ;
+        $runtime = new ApplicationRuntime(new InMemoryCache(), $factory);
+        $browserRuntime = $runtime->createBrowserRuntime($this->directory.'/traces');
+        $application = $this->createApplication($installation, $runtime, $browserRuntime);
+        $browserRuntime->createBrowser('https://example.test');
+
+        try {
+            try {
+                $application->release();
+                $this->fail('Expected context cleanup to fail.');
+            } catch (\RuntimeException $exception) {
+                $this->assertSame($failure, $exception);
+            }
+
+            $this->assertFalse(\is_resource($lock));
+            $this->assertNull((new \ReflectionProperty(DatabaseManager::class, 'connection'))->getValue($this->database));
+        } finally {
+            $application->release();
+            $runtime->close();
+        }
     }
 
     public function testExposesTheInitialInstallationLoadWithoutDatabaseAccess(): void
@@ -279,13 +319,20 @@ final class ManagedEditionFixtureTest extends TestCase
             $this->database,
             new FingerprintSet('fixtures', 'fixtures', 'fixtures'),
         );
+        $runtime = ApplicationRuntime::create();
+
+        return $this->createApplication($installation, $runtime, $runtime->createBrowserRuntime($this->directory.'/traces'));
+    }
+
+    private function createApplication(PreparedInstallation $installation, ApplicationRuntime $runtime, BrowserRuntime $browserRuntime): ManagedEdition
+    {
         $recipe = InstallationRecipe::create(ComposerConfig::managedEdition('^5.7'))->withFixtureFile($this->fixture);
 
         return new ManagedEdition(
             new ManagedEditionState($installation, ManagedEditionConfig::create($recipe, $this->directory), new ContaoConsole(new ProcessRunner())),
             new ServerManager(),
-            new BrowserRuntime($this->directory.'/traces', new PlaywrightManager()),
-            ApplicationRuntime::create(),
+            $browserRuntime,
+            $runtime,
         );
     }
 }

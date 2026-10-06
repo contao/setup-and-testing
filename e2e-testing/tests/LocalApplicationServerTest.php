@@ -158,13 +158,20 @@ class LocalApplicationServerTest extends TestCase
     public function testServerStopsEvenWhenBrowserCleanupFails(): void
     {
         $server = (new WebServerManager())->start(WebServerConfig::php($this->directory));
-        $factory = $this->createMock(BrowserSessionFactoryInterface::class);
-        $factory
+        $context = $this->createMock(BrowserContextInterface::class);
+        $context
             ->expects($this->once())
             ->method('close')
             ->willThrowException(new \RuntimeException('browser cleanup failed'))
         ;
+        $factory = $this->createStub(BrowserSessionFactoryInterface::class);
+        $factory
+            ->method('create')
+            ->willReturn(new BrowserSession($server->baseUri, $context, $this->createStub(PageInterface::class)))
+        ;
         $application = new Application(ApplicationConfig::create($server->baseUri), new BrowserRuntime('/unused', $factory), ApplicationRuntime::shared(), $server);
+
+        $application->createBrowser();
 
         try {
             $application->release();

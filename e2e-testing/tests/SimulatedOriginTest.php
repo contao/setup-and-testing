@@ -16,8 +16,6 @@ use Composer\Autoload\ClassLoader;
 use Contao\E2eTesting\Application\ApplicationConfig;
 use Contao\E2eTesting\Application\ApplicationRuntime;
 use Contao\E2eTesting\Application\LocalApplicationConfig;
-use Contao\E2eTesting\Browser\BrowserRuntime;
-use Contao\E2eTesting\Browser\PlaywrightManager;
 use Contao\E2eTesting\Cache\FingerprintSet;
 use Contao\E2eTesting\Database\DatabaseManager;
 use Contao\E2eTesting\Database\DatabaseServerConfig;
@@ -202,11 +200,13 @@ final class SimulatedOriginTest extends TestCase
         (new ApplicationPreparer())->prepare($config, $installation->directory(), null);
         $this->writeFrontController($installation->directory());
 
+        $runtime = ApplicationRuntime::create();
+
         return new ManagedEdition(
             new ManagedEditionState($installation, $config, new ContaoConsole(new ProcessRunner())),
             new ServerManager(),
-            new BrowserRuntime($this->directory.'/traces', new PlaywrightManager()),
-            ApplicationRuntime::shared(),
+            $runtime->createBrowserRuntime($this->directory.'/traces'),
+            $runtime,
         );
     }
 

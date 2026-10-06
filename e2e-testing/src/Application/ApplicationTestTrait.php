@@ -64,6 +64,8 @@ trait ApplicationTestTrait
     #[Before]
     protected function resetApplication(): void
     {
+        self::browserRuntime()?->reset();
+
         if (self::$applicationFresh) {
             self::$applicationFresh = false;
 

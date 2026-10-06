@@ -75,7 +75,7 @@ class ApplicationTest extends TestCase
         ;
 
         $factory
-            ->expects($this->once())
+            ->expects($this->never())
             ->method('close')
         ;
         $application = new Application(ApplicationConfig::create('http://localhost:8080'), new BrowserRuntime('/unused', $factory), ApplicationRuntime::shared());

@@ -40,7 +40,9 @@ class BrowserSessionTest extends TestCase
         ;
         $browser = new BrowserSession('http://localhost:8000', $context, $this->createStub(PageInterface::class));
 
+        $this->assertFalse($browser->isClosed());
         $browser->close();
+        $this->assertTrue($browser->isClosed());
         $browser->close();
     }
 

@@ -53,7 +53,7 @@ class BrowserRuntimeTest extends TestCase
         ;
 
         $factory
-            ->expects($this->once())
+            ->expects($this->never())
             ->method('close')
         ;
         $runtime = new BrowserRuntime('/unused', $factory);
@@ -63,8 +63,46 @@ class BrowserRuntimeTest extends TestCase
         $runtime->createBrowser('https://example.test');
         $this->assertSame($secondPage, $runtime->currentPage());
         $runtime->reset();
-        $runtime->close();
+        $runtime->reset();
 
+        $this->expectException(\LogicException::class);
+        $runtime->currentPage();
+    }
+
+    public function testResetClosesRemainingContextsWhenOneFails(): void
+    {
+        $failure = new \RuntimeException('First context cleanup failed');
+        $first = $this->createStub(BrowserContextInterface::class);
+        $first
+            ->method('close')
+            ->willThrowException($failure)
+        ;
+        $second = $this->createMock(BrowserContextInterface::class);
+        $second
+            ->expects($this->once())
+            ->method('close')
+        ;
+        $factory = $this->createStub(BrowserSessionFactoryInterface::class);
+        $factory
+            ->method('create')
+            ->willReturnOnConsecutiveCalls(
+                new BrowserSession('https://example.test', $first, $this->createStub(PageInterface::class)),
+                new BrowserSession('https://example.test', $second, $this->createStub(PageInterface::class)),
+            )
+        ;
+        $runtime = new BrowserRuntime('/unused', $factory);
+        $runtime->createBrowser('https://example.test');
+        $runtime->createBrowser('https://example.test');
+
+        try {
+            $runtime->reset();
+            $this->fail('Expected context cleanup to fail.');
+        } catch (\RuntimeException $exception) {
+            $this->assertSame($failure, $exception);
+        }
+
+        $runtime->reset();
+        $this->assertSame([], $runtime->finishTracing('empty'));
         $this->expectException(\LogicException::class);
         $runtime->currentPage();
     }
@@ -107,7 +145,7 @@ class BrowserRuntimeTest extends TestCase
             $runtime->reset();
             $this->assertSame([], $runtime->finishTracing('Empty'));
         } finally {
-            $runtime->close();
+            $runtime->reset();
             (new Filesystem())->remove($directory);
         }
     }

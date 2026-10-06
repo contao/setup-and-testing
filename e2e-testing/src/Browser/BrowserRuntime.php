@@ -74,17 +74,21 @@ final class BrowserRuntime
 
     public function reset(): void
     {
+        $failure = null;
+
         foreach ($this->sessions as $browser) {
-            $browser->close();
+            try {
+                $browser->close();
+            } catch (\Throwable $exception) {
+                $failure ??= $exception;
+            }
         }
 
         $this->sessions = [];
         $this->currentBrowser = null;
-    }
 
-    public function close(): void
-    {
-        $this->reset();
-        $this->sessionFactory->close();
+        if ($failure) {
+            throw $failure;
+        }
     }
 }
