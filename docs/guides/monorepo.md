@@ -38,7 +38,7 @@ Merge that setting into your existing root manifest. An explicit root `version` 
 Run from the monorepo root:
 
 ```shell
-composer require --dev contao/e2e-testing
+composer require --dev contao/e2e-testing:dev-main contao/installation-recipe:dev-main
 vendor/bin/playwright-install --browsers
 ```
 

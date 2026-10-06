@@ -5,7 +5,7 @@ Use native PHP, Composer and Node.js 20 or newer. Install the PHP extensions req
 Run commands from the consumer project root. Composer generates Windows proxies for PHPUnit, Playwright and `contao-e2e`:
 
 ```powershell
-composer require --dev contao/e2e-testing
+composer require --dev contao/e2e-testing:dev-main contao/installation-recipe:dev-main
 vendor/bin/playwright-install --browsers
 vendor/bin/phpunit --testsuite=e2e
 ```

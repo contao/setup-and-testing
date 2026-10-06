@@ -17,7 +17,7 @@ Install the [supported PHP, Composer and Node.js versions](../reference/requirem
 Run from the repository where you want to keep the tests. This can be your application repository or a separate test repository. If it has no `composer.json`, run `composer init` first.
 
 ```shell
-composer require --dev contao/e2e-testing
+composer require --dev contao/e2e-testing:dev-main contao/installation-recipe:dev-main
 vendor/bin/playwright-install --browsers
 ```
 

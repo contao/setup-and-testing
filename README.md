@@ -1,5 +1,7 @@
 # Installation recipes and end-to-end testing
 
+> **Development status:** These packages are still under very heavy development. There are no release tags yet, so require `dev-main` in Composer and expect breaking API changes. We plan a series of `0.x` releases while we work toward a stable API for Contao Core, extensions and regular web applications. [Feedback is always welcome](https://github.com/contao/setup-and-testing/issues).
+
 This monorepo develops two packages on a shared version line that is independent of Contao core. Each package has a distinct responsibility:
 
 | Package | Responsibility | Use it for |
@@ -7,7 +9,7 @@ This monorepo develops two packages on a shared version line that is independent
 | [`contao/installation-recipe`](installation-recipe/) | Defines and applies portable recipes containing Composer requirements, configuration, database fixtures, and project files. The host application supplies operations such as dependency installation and migration. | Building an installer or importer that consumes recipes. |
 | [`contao/e2e-testing`](e2e-testing/) | Provides browser testing for existing web applications and consumes recipes to provision isolated Contao Managed Editions with a database, installation cache, web server, and HTTP clients. | Testing Contao extensions, complete Contao projects, or other web applications from PHPUnit. |
 
-The dependency goes from `contao/e2e-testing` to `contao/installation-recipe`. They live together so changes to the recipe model and its test consumer can be tested atomically. Both packages are released independently of `contao/contao`, and the consuming project selects the Contao version to test.
+The dependency goes from `contao/e2e-testing` to `contao/installation-recipe`. They live together so changes to the recipe model and its test consumer can be tested atomically. Both packages will be released independently of `contao/contao`, and the consuming project selects the Contao version to test.
 
 ## Documentation
 

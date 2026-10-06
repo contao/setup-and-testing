@@ -1,9 +1,11 @@
 # Contao installation recipes
 
+> **Development status:** These packages are still under very heavy development. There are no release tags yet, so require `dev-main` in Composer and expect breaking API changes. We plan a series of `0.x` releases while we work toward a stable API for Contao Core, extensions and regular web applications. [Feedback is always welcome](https://github.com/contao/setup-and-testing/issues).
+
 `contao/installation-recipe` describes reusable Composer requirements, configuration, database fixtures and project files, and applies portable recipe archives through a host application's runtime.
 
 ```shell
-composer require contao/installation-recipe
+composer require contao/installation-recipe:dev-main
 ```
 
 Choose your starting point in the shared documentation:

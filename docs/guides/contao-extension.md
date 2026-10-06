@@ -9,7 +9,7 @@ You need [the supported PHP and Node.js versions](../reference/requirements.md),
 ## Install the tooling
 
 ```shell
-composer require --dev contao/e2e-testing
+composer require --dev contao/e2e-testing:dev-main contao/installation-recipe:dev-main
 vendor/bin/playwright-install --browsers
 ```
 

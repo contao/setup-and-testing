@@ -1,10 +1,14 @@
 # Contao E2E testing
 
+> **Development status:** These packages are still under very heavy development. There are no release tags yet, so require `dev-main` in Composer and expect breaking API changes. We plan a series of `0.x` releases while we work toward a stable API for Contao Core, extensions and regular web applications. [Feedback is always welcome](https://github.com/contao/setup-and-testing/issues).
+
 `contao/e2e-testing` provides PHPUnit browser testing for existing web applications and isolated Contao Managed Editions built from installation recipes.
 
 ```shell
-composer require --dev contao/e2e-testing
+composer require --dev contao/e2e-testing:dev-main contao/installation-recipe:dev-main
 ```
+
+Require both packages explicitly so Composer permits their development versions.
 
 Choose your starting point in the shared documentation:
 

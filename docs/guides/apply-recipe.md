@@ -9,7 +9,7 @@ Use a prepared Contao test project with PHP, Composer, the ZIP extension and a c
 In the target project, install the recipe package and Symfony Process, which this example uses to run the host commands:
 
 ```shell
-composer require contao/installation-recipe symfony/process
+composer require contao/installation-recipe:dev-main symfony/process
 ```
 
 Place the archive at the project root as `example-theme.zip`. Create `install-recipe.php` there:
