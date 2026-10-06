@@ -59,7 +59,7 @@ nav:
           - Local application servers: testing/webservers.md
           - Browsers and assertions: testing/browsers.md
           - Contao backend interactions: testing/backend.md
-          - Frontend tests and origins: testing/frontend.md
+          - Frontend tests and HTTP requests: testing/frontend.md
           - Databases and isolation: testing/databases.md
           - Test-specific DCA: testing/dca.md
           - Custom PHPUnit base classes: testing/phpunit.md

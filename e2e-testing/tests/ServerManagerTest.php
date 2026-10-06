@@ -96,14 +96,13 @@ class ServerManagerTest extends TestCase
         $server = (new ServerManager($filesystem))->start($directory, 'sqlite:///:memory:', $directory.'/runtime');
 
         try {
-            $filesystem->dumpFile($server->mappingFile, json_encode(['transport.test' => ['host' => 'example.org', 'https' => true]], JSON_THROW_ON_ERROR));
             $baseUri = 'http://127.0.0.1:'.$server->port;
-            $response = HttpClient::create()->request('GET', $baseUri.'/api/data.json?example=1', ['headers' => ['Host' => 'transport.test']]);
+            $response = HttpClient::create()->request('GET', $baseUri.'/api/data.json?example=1', ['headers' => ['Host' => 'example.org']]);
             $this->assertSame(
                 [
                     'host' => 'example.org',
-                    'https' => 'on',
-                    'port' => '443',
+                    'https' => null,
+                    'port' => (string) $server->port,
                     'uri' => '/api/data.json?example=1',
                     'database' => 'sqlite:///:memory:',
                     'cache' => '1',

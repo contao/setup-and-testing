@@ -29,11 +29,9 @@ final readonly class ServerManager
     {
         $this->assertDocumentRootExists($directory);
 
-        $mappingFile = Path::join($runtimeDirectory, 'origins.json');
         $routerFile = Path::join($runtimeDirectory, 'router.php');
         $this->filesystem->mkdir($runtimeDirectory);
-        $this->filesystem->dumpFile($mappingFile, "{}\n");
-        $this->filesystem->dumpFile($routerFile, $this->router($directory, $mappingFile));
+        $this->filesystem->dumpFile($routerFile, $this->router($directory));
 
         $config = WebServerConfig::php($directory, router: $routerFile)
             ->withEnvironment([
@@ -45,7 +43,7 @@ final readonly class ServerManager
         ;
         $server = (new WebServerManager($this->portFinder, $this->filesystem))->start($config);
 
-        return new ServerProcess($server, $server->port, $mappingFile);
+        return new ServerProcess($server, $server->port);
     }
 
     private function assertDocumentRootExists(string $directory): void
@@ -57,8 +55,8 @@ final readonly class ServerManager
         }
     }
 
-    private function router(string $directory, string $mappingFile): string
+    private function router(string $directory): string
     {
-        return PhpRouter::generate(Path::join($directory, 'public/index.php'), (new OriginMap($mappingFile))->prelude());
+        return PhpRouter::generate(Path::join($directory, 'public/index.php'));
     }
 }

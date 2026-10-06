@@ -14,7 +14,7 @@ namespace Contao\E2eTesting\Http;
 
 final class PhpRouter
 {
-    public static function generate(string $index, string $prelude = ''): string
+    public static function generate(string $index): string
     {
         $index = var_export($index, true);
 
@@ -22,8 +22,6 @@ final class PhpRouter
             <?php
 
             declare(strict_types=1);
-
-            $prelude
 
             \$path = rawurldecode((string) parse_url(\$_SERVER['REQUEST_URI'], PHP_URL_PATH) ?: '/');
 

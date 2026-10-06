@@ -13,7 +13,6 @@ declare(strict_types=1);
 namespace Contao\E2eTesting\Tests;
 
 use Contao\E2eTesting\Http\HttpRequest;
-use Contao\E2eTesting\Http\Origin;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
@@ -21,7 +20,7 @@ final class HttpRequestTest extends TestCase
 {
     public function testHeaderChangesAreImmutableAndCaseInsensitive(): void
     {
-        $original = HttpRequest::create('patch', '/api/example', Origin::https('example.test'))
+        $original = HttpRequest::create('patch', '/api/example')
             ->withHeader('Authorization', 'Bearer original')
             ->withBody('raw body')
         ;
@@ -30,13 +29,12 @@ final class HttpRequestTest extends TestCase
         $this->assertSame(['authorization' => 'Bearer changed', 'Accept' => 'text/plain'], $request->headers);
         $this->assertSame('PATCH', $request->method);
         $this->assertSame('raw body', $request->body);
-        $this->assertSame($original->origin, $request->origin);
         $this->assertSame('/api/example', $request->path);
     }
 
     public function testJsonWithoutABodyOnlySetsAccept(): void
     {
-        $request = HttpRequest::json('GET', '/api/example', Origin::http('example.test'));
+        $request = HttpRequest::json('GET', '/api/example');
         $this->assertSame(['Accept' => 'application/json'], $request->headers);
         $this->assertNull($request->body);
     }
@@ -44,7 +42,7 @@ final class HttpRequestTest extends TestCase
     #[DataProvider('jsonBodies')]
     public function testJsonBodiesSetTheContentType(mixed $body, string $encoded): void
     {
-        $original = HttpRequest::json('POST', '/api/example', Origin::http('example.test'));
+        $original = HttpRequest::json('POST', '/api/example');
         $request = $original->withJson($body);
         $this->assertSame($encoded, $request->body);
         $this->assertSame(['Accept' => 'application/json', 'Content-Type' => 'application/json'], $request->headers);
@@ -63,7 +61,7 @@ final class HttpRequestTest extends TestCase
 
     public function testJsonPreservesCustomMediaTypes(): void
     {
-        $request = HttpRequest::create('POST', '/api/example', Origin::http('example.test'))
+        $request = HttpRequest::create('POST', '/api/example')
             ->withHeaders(['accept' => 'application/ld+json', 'content-type' => 'application/merge-patch+json'])
             ->withJson(['title' => 'Example'])
         ;
@@ -74,6 +72,6 @@ final class HttpRequestTest extends TestCase
     public function testJsonEncodingErrorsAreReported(): void
     {
         $this->expectException(\JsonException::class);
-        HttpRequest::get('/', Origin::http('example.test'))->withJson("\xff");
+        HttpRequest::get('/')->withJson("\xff");
     }
 }

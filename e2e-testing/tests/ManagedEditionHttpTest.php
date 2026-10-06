@@ -16,7 +16,6 @@ use Contao\E2eTesting\Cache\FingerprintSet;
 use Contao\E2eTesting\Database\DatabaseManager;
 use Contao\E2eTesting\Database\DatabaseServerConfig;
 use Contao\E2eTesting\Http\HttpRequest;
-use Contao\E2eTesting\Http\Origin;
 use Contao\E2eTesting\Installation\InstallationLease;
 use Contao\E2eTesting\Installation\PreparedInstallation;
 use Contao\E2eTesting\ManagedEdition\ManagedEdition;
@@ -63,10 +62,10 @@ final class ManagedEditionHttpTest extends TestCase
         (new Filesystem())->remove($this->directory);
     }
 
-    public function testSendsJsonWithTheMethodHeadersBodyAndEmulatedOrigin(): void
+    public function testSendsJsonWithTheMethodHeadersBodyAndHost(): void
     {
-        $request = HttpRequest::json('POST', '/api/example?test=1', Origin::https('example.test'))
-            ->withHeaders(['Authorization' => 'Bearer e2e'])
+        $request = HttpRequest::json('POST', '/api/example?test=1')
+            ->withHeaders(['Authorization' => 'Bearer e2e', 'Host' => 'example.test'])
             ->withJson(['title' => 'Example'])
         ;
         $response = $this->application->send($request);
@@ -76,7 +75,7 @@ final class ManagedEditionHttpTest extends TestCase
                 'method' => 'POST',
                 'path' => '/api/example?test=1',
                 'host' => 'example.test',
-                'https' => 'on',
+                'https' => null,
                 'accept' => 'application/json',
                 'content-type' => 'application/json',
                 'authorization' => 'Bearer e2e',
@@ -89,7 +88,7 @@ final class ManagedEditionHttpTest extends TestCase
     #[DataProvider('requestsWithoutBodies')]
     public function testJsonWithoutABodyDoesNotSendAJsonContentType(string $method): void
     {
-        $response = $this->application->send(HttpRequest::json($method, '/api/example', Origin::http('example.test')));
+        $response = $this->application->send(HttpRequest::json($method, '/api/example'));
         $values = $response->toArray(false);
         $this->assertSame($method, $values['method']);
         $this->assertSame('application/json', $values['accept']);
@@ -110,7 +109,7 @@ final class ManagedEditionHttpTest extends TestCase
 
     public function testSendsRawBodiesAndCustomMediaTypes(): void
     {
-        $request = HttpRequest::create('PATCH', '/api/example', Origin::http('example.test'))
+        $request = HttpRequest::create('PATCH', '/api/example')
             ->withHeaders(['Content-Type' => 'text/plain', 'Accept' => 'text/plain'])
             ->withBody('raw body')
         ;
@@ -121,7 +120,7 @@ final class ManagedEditionHttpTest extends TestCase
         $this->assertSame('raw body', $values['body']);
     }
 
-    public function testRequestsAndBrowserKitWorkWithoutAnOrigin(): void
+    public function testRequestsAndBrowserKitUseTheLocalServerUrl(): void
     {
         $values = $this->application->send(HttpRequest::json('GET', '/default'))->toArray(false);
         $this->assertSame('/default', $values['path']);
