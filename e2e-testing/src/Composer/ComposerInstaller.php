@@ -13,14 +13,14 @@ declare(strict_types=1);
 namespace Contao\E2eTesting\Composer;
 
 use Contao\E2eTesting\ManagedEdition\ManagedEditionConfig;
-use Contao\E2eTesting\Process\ProcessRunner;
+use Contao\E2eTesting\Process\ProcessRunnerInterface;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\Filesystem\Path;
 
 final readonly class ComposerInstaller
 {
     public function __construct(
-        private ProcessRunner $processRunner,
+        private ProcessRunnerInterface $processRunner,
         private Filesystem $filesystem = new Filesystem(),
     ) {
     }

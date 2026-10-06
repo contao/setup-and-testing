@@ -19,6 +19,7 @@ use Contao\E2eTesting\Http\ServerManager;
 use Contao\E2eTesting\Installation\ApplicationPreparer;
 use Contao\E2eTesting\Installation\InstallationBuilder;
 use Contao\E2eTesting\Installation\InstallationPool;
+use Contao\E2eTesting\Installation\InstallationWorkspace;
 use Contao\E2eTesting\Installation\PreparedInstallation;
 use Contao\E2eTesting\Process\ContaoConsole;
 use Contao\E2eTesting\Process\ProcessRunner;
@@ -56,7 +57,7 @@ final readonly class ManagedEditionFactory
         );
 
         try {
-            $builder->prepare($config, $installation);
+            $builder->prepare($config, new InstallationWorkspace($installation->directory(), $fingerprints), $database);
         } catch (\Throwable $exception) {
             $database->close();
             $lease->release();
