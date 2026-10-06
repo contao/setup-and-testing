@@ -21,7 +21,6 @@ final class ServerProcess
     public function __construct(
         Process|WebServerProcess $process,
         public readonly int $port,
-        public readonly string $mappingFile,
     ) {
         $this->process = $process instanceof WebServerProcess ? $process : new WebServerProcess($process, $port);
     }

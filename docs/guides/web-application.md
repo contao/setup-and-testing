@@ -129,19 +129,17 @@ Paths use the configured application URL, including its subdirectory. For a requ
 
 For HTML tests without JavaScript, use `self::application()->createHttpBrowser()`. This returns Symfony BrowserKit's HTTP browser, whose request paths resolve from the server root. For applications in a subdirectory, pass the full URL from `self::application()->uri('/login')`.
 
-### Emulate an origin
+### Test domain-specific behavior
 
-With `LocalApplicationConfig::php()` and its generated router, the application can emulate a domain and HTTPS without DNS or certificates:
+Send a `Host` header for HTTP requests that need a particular domain:
 
 ```php
-use Contao\E2eTesting\Http\Origin;
-
 $response = self::application()->send(
-    HttpRequest::json('GET', '/api/example', Origin::https('example.test')),
+    HttpRequest::get('/api/example')->withHeader('Host', 'example.test'),
 );
 ```
 
-Pass an optional origin to `HttpRequest::get()` or `HttpRequest::create()` for other HTTP requests. It also works with `createHttpBrowser()` and `createBrowser(origin: ...)`. Existing servers, custom PHP routers and custom startup commands must provide their own domain and HTTPS handling. Without an origin, all methods use the actual application URL.
+This keeps the connection pointed at the configured application URL. For domain-specific browser navigation or HTTPS, configure your test server and connect to its URL with `ApplicationConfig::create($url)`. See [page domains](../testing/frontend.md#test-a-page-domain) for BrowserKit requests with a custom `Host` header.
 
 ## Use this in a monorepo
 

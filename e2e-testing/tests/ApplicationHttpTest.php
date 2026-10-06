@@ -15,9 +15,7 @@ namespace Contao\E2eTesting\Tests;
 use Contao\E2eTesting\Application\ApplicationConfig;
 use Contao\E2eTesting\Application\ApplicationInterface;
 use Contao\E2eTesting\Application\LocalApplicationConfig;
-use Contao\E2eTesting\Exception\E2eTestException;
 use Contao\E2eTesting\Http\HttpRequest;
-use Contao\E2eTesting\Http\Origin;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Filesystem\Filesystem;
 
@@ -43,6 +41,7 @@ final class ApplicationHttpTest extends TestCase
                 'method' => $_SERVER['REQUEST_METHOD'],
                 'path' => $_SERVER['REQUEST_URI'],
                 'host' => $_SERVER['HTTP_HOST'],
+                'origin' => $_SERVER['HTTP_ORIGIN'] ?? null,
                 'https' => $_SERVER['HTTPS'] ?? null,
                 'accept' => $_SERVER['HTTP_ACCEPT'] ?? null,
                 'content-type' => $_SERVER['CONTENT_TYPE'] ?? null,
@@ -100,15 +99,18 @@ final class ApplicationHttpTest extends TestCase
         $this->assertSame('//', $values['path']);
     }
 
-    public function testOriginsEmulateBothHttpAndHttpsWithoutLeakingBetweenRequests(): void
+    public function testHostAndOriginHeadersAreForwardedWithoutChangingTheConnection(): void
     {
-        foreach ([Origin::https('example.test'), Origin::http('example.test')] as $origin) {
-            $values = $this->application->send(HttpRequest::get('/endpoint', $origin))->toArray(false);
-            $this->assertSame('example.test', $values['host']);
-            $this->assertSame($origin->https ? 'on' : null, $values['https']);
-        }
+        $request = HttpRequest::get('/endpoint')
+            ->withHeaders(['Host' => 'example.test', 'Origin' => 'https://caller.example'])
+        ;
+        $values = $this->application->send($request)->toArray(false);
+        $this->assertSame('example.test', $values['host']);
+        $this->assertSame('https://caller.example', $values['origin']);
+        $this->assertNull($values['https']);
         $values = $this->application->send(HttpRequest::get('/endpoint'))->toArray(false);
         $this->assertStringStartsWith('127.0.0.1:', $values['host']);
+        $this->assertNull($values['origin']);
         $this->assertNull($values['https']);
     }
 
@@ -174,14 +176,14 @@ final class ApplicationHttpTest extends TestCase
         }
     }
 
-    public function testBrowserKitSupportsOriginEmulation(): void
+    public function testBrowserKitSupportsTheHostHeader(): void
     {
-        $browser = $this->application->createHttpBrowser(Origin::https('example.test'));
-        $browser->request('GET', '/endpoint');
+        $browser = $this->application->createHttpBrowser();
+        $browser->request('GET', $this->application->uri('/endpoint'), server: ['HTTP_HOST' => 'example.test']);
 
         $values = json_decode($browser->getInternalResponse()->getContent(), true, flags: JSON_THROW_ON_ERROR);
         $this->assertSame('example.test', $values['host']);
-        $this->assertSame('on', $values['https']);
+        $this->assertNull($values['https']);
     }
 
     public function testRedirectsAreNotFollowedByEitherHttpClient(): void
@@ -192,28 +194,14 @@ final class ApplicationHttpTest extends TestCase
         $this->assertSame(302, $browser->getInternalResponse()->getStatusCode());
     }
 
-    public function testExistingServersRequireTheirOwnOriginHandling(): void
+    public function testCustomRoutersReceiveTheHostHeader(): void
     {
-        $application = ApplicationConfig::create($this->application->uri())->createApplication();
-        $this->expectException(E2eTestException::class);
-        $this->expectExceptionMessage('Origin emulation requires');
-
-        try {
-            $application->send(HttpRequest::get('/', Origin::https('example.test')));
-        } finally {
-            $application->release();
-        }
-    }
-
-    public function testCustomRoutersRequireTheirOwnOriginHandling(): void
-    {
-        (new Filesystem())->dumpFile($this->directory.'/router.php', '<?php echo "custom router";');
+        (new Filesystem())->dumpFile($this->directory.'/router.php', '<?php echo $_SERVER["HTTP_HOST"];');
         $application = LocalApplicationConfig::php($this->directory, router: 'router.php')->createApplication();
-        $this->expectException(E2eTestException::class);
-        $this->expectExceptionMessage('Custom routers and server commands');
 
         try {
-            $application->send(HttpRequest::get('/', Origin::https('example.test')));
+            $response = $application->send(HttpRequest::get('/')->withHeader('Host', 'example.test'));
+            $this->assertSame('example.test', $response->getContent());
         } finally {
             $application->release();
         }

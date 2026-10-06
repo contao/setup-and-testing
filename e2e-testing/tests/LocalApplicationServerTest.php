@@ -235,14 +235,12 @@ class LocalApplicationServerTest extends TestCase
     public function testGeneratedRouterIsRemovedAfterShutdown(): void
     {
         $router = (new Filesystem())->tempnam($this->directory, 'router-');
-        $origins = (new Filesystem())->tempnam($this->directory, 'origins-');
         $filesystem = $this->getMockBuilder(Filesystem::class)->onlyMethods(['tempnam'])->getMock();
         $filesystem
             ->expects($this->atLeastOnce())
             ->method('tempnam')
             ->willReturnCallback(static fn (string $directory, string $prefix): string => match ($prefix) {
                 'contao-e2e-router-' => $router,
-                'contao-e2e-origins-' => $origins,
                 default => (new Filesystem())->tempnam($directory, $prefix),
             })
         ;
@@ -250,33 +248,29 @@ class LocalApplicationServerTest extends TestCase
 
         try {
             $this->assertFileExists($router);
-            $this->assertFileExists($origins);
             $this->assertSame(200, HttpClient::create()->request('GET', $server->baseUri.'/route')->getStatusCode());
         } finally {
             $server->stop();
         }
 
         $this->assertFileDoesNotExist($router);
-        $this->assertFileDoesNotExist($origins);
     }
 
     public function testRouterWriteFailureRemovesTheTemporaryFile(): void
     {
         $router = (new Filesystem())->tempnam($this->directory, 'router-');
-        $origins = (new Filesystem())->tempnam($this->directory, 'origins-');
         $filesystem = $this->getMockBuilder(Filesystem::class)->onlyMethods(['tempnam', 'dumpFile'])->getMock();
         $filesystem
             ->expects($this->atLeastOnce())
             ->method('tempnam')
             ->willReturnCallback(static fn (string $directory, string $prefix): string => match ($prefix) {
                 'contao-e2e-router-' => $router,
-                'contao-e2e-origins-' => $origins,
                 default => (new Filesystem())->tempnam($directory, $prefix),
             })
         ;
 
         $filesystem
-            ->expects($this->exactly(2))
+            ->expects($this->once())
             ->method('dumpFile')
             ->willReturnCallback(
                 static function (string $file, string $content) use ($router): void {
@@ -294,7 +288,6 @@ class LocalApplicationServerTest extends TestCase
         } catch (\RuntimeException $exception) {
             $this->assertSame('router write failed', $exception->getMessage());
             $this->assertFileDoesNotExist($router);
-            $this->assertFileDoesNotExist($origins);
         }
     }
 

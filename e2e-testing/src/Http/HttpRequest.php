@@ -20,25 +20,24 @@ final readonly class HttpRequest
     private function __construct(
         public string $method,
         public string $path,
-        public Origin|null $origin,
         public array $headers = [],
         public string|null $body = null,
     ) {
     }
 
-    public static function create(string $method, string $path, Origin|null $origin = null): self
+    public static function create(string $method, string $path): self
     {
-        return new self(strtoupper($method), $path, $origin);
+        return new self(strtoupper($method), $path);
     }
 
-    public static function get(string $path, Origin|null $origin = null): self
+    public static function get(string $path): self
     {
-        return self::create('GET', $path, $origin);
+        return self::create('GET', $path);
     }
 
-    public static function json(string $method, string $path, Origin|null $origin = null): self
+    public static function json(string $method, string $path): self
     {
-        return self::create($method, $path, $origin)->withHeader('Accept', 'application/json');
+        return self::create($method, $path)->withHeader('Accept', 'application/json');
     }
 
     public function withHeader(string $name, string $value): self
@@ -63,12 +62,12 @@ final readonly class HttpRequest
             $merged[$name] = $value;
         }
 
-        return new self($this->method, $this->path, $this->origin, $merged, $this->body);
+        return new self($this->method, $this->path, $merged, $this->body);
     }
 
     public function withBody(string|null $body): self
     {
-        return new self($this->method, $this->path, $this->origin, $this->headers, $body);
+        return new self($this->method, $this->path, $this->headers, $body);
     }
 
     public function withJson(mixed $body): self

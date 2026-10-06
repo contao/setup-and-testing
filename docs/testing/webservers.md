@@ -4,7 +4,7 @@ Use `LocalApplicationConfig` when the tests should start and stop a server for y
 
 The server starts once per test class on a free loopback port. Browser resets between tests leave it running. Releasing the application stops it, including when a test fails. Application installation, builds, migrations and database resets remain your project's responsibility.
 
-Managed Editions use the same server launcher, port allocation, readiness checks, PHP front-controller routing and shutdown. Their configuration also supplies the Contao database environment and frontend origin mapping.
+Managed Editions use the same server launcher, port allocation, readiness checks, PHP front-controller routing and shutdown. Their configuration also supplies the Contao database environment.
 
 ## Serve a PHP project
 

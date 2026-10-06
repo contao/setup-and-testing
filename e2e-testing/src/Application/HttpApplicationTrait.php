@@ -14,7 +14,6 @@ namespace Contao\E2eTesting\Application;
 
 use Contao\E2eTesting\Http\ApplicationHttpBrowser;
 use Contao\E2eTesting\Http\HttpRequest;
-use Contao\E2eTesting\Http\Origin;
 use Symfony\Component\BrowserKit\HttpBrowser;
 use Symfony\Component\HttpClient\HttpClient;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
@@ -22,20 +21,20 @@ use Symfony\Contracts\HttpClient\ResponseInterface;
 
 trait HttpApplicationTrait
 {
-    abstract public function uri(string $path = '/', Origin|null $origin = null): string;
+    abstract public function uri(string $path = '/'): string;
 
     public function send(HttpRequest $request): ResponseInterface
     {
         return HttpClient::create(['max_redirects' => 0])->request(
             $request->method,
-            $this->uri($request->path, $request->origin),
+            $this->uri($request->path),
             ['headers' => $request->headers, 'body' => $request->body],
         );
     }
 
-    public function createHttpBrowser(Origin|null $origin = null): HttpBrowser
+    public function createHttpBrowser(): HttpBrowser
     {
-        $uri = $this->uri(origin: $origin);
+        $uri = $this->uri();
         $host = parse_url((string) $uri, PHP_URL_HOST);
         $port = parse_url((string) $uri, PHP_URL_PORT);
 

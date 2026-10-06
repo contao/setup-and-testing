@@ -28,17 +28,7 @@ final readonly class WebServerManager
     {
         $port = $this->portFinder->find();
         $command = $config->commandForPort($port);
-        $origins = null !== $config->frontController() && is_file($config->frontController()) ? new OriginMap($this->filesystem->tempnam(sys_get_temp_dir(), 'contao-e2e-origins-')) : null;
-
-        try {
-            $router = $this->createRouter($config, $origins);
-        } catch (\Throwable $exception) {
-            if ($origins) {
-                $this->filesystem->remove($origins->file);
-            }
-
-            throw $exception;
-        }
+        $router = $this->createRouter($config);
 
         if (null !== $router) {
             $command[] = $router;
@@ -49,7 +39,7 @@ final readonly class WebServerManager
 
         $process->disableOutput();
 
-        $server = new WebServerProcess($process, $port, $router, $origins);
+        $server = new WebServerProcess($process, $port, $router);
 
         try {
             $process->start();
@@ -86,7 +76,7 @@ final readonly class WebServerManager
         throw new E2eTestException('The application web server did not listen on 127.0.0.1:'.$port.' within 15 seconds.');
     }
 
-    private function createRouter(WebServerConfig $config, OriginMap|null $origins): string|null
+    private function createRouter(WebServerConfig $config): string|null
     {
         $index = $config->frontController();
 
@@ -97,10 +87,7 @@ final readonly class WebServerManager
         $file = $this->filesystem->tempnam(sys_get_temp_dir(), 'contao-e2e-router-');
 
         try {
-            if ($origins) {
-                $this->filesystem->dumpFile($origins->file, "{}\n");
-            }
-            $this->filesystem->dumpFile($file, PhpRouter::generate($index, $origins?->prelude() ?? ''));
+            $this->filesystem->dumpFile($file, PhpRouter::generate($index));
         } catch (\Throwable $exception) {
             $this->filesystem->remove($file);
 

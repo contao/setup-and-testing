@@ -22,8 +22,6 @@ use Contao\E2eTesting\Browser\BrowserType;
 use Contao\E2eTesting\Browser\PlaywrightManager;
 use Contao\E2eTesting\Database\DatabaseManager;
 use Contao\E2eTesting\Database\DatabaseResetMode;
-use Contao\E2eTesting\Http\Origin;
-use Contao\E2eTesting\Http\OriginMap;
 use Contao\E2eTesting\Http\ServerManager;
 use Contao\E2eTesting\Http\ServerProcess;
 use Contao\InstallationRecipe\Fixture\FixtureResult;
@@ -133,24 +131,23 @@ final class ManagedEdition implements ApplicationInterface
         return $this;
     }
 
-    public function uri(string $path = '/', Origin|null $origin = null): string
+    public function uri(string $path = '/'): string
     {
         $this->startServer();
         $server = $this->server ?? throw new \LogicException('The E2E web server did not start.');
-        $host = !$origin ? 'localhost' : (new OriginMap($server->mappingFile))->register($origin);
         $path = str_starts_with($path, '/') ? $path : '/'.$path;
 
-        return 'http://'.$host.':'.$server->port.$path;
+        return 'http://localhost:'.$server->port.$path;
     }
 
-    public function createBrowser(BrowserType $type = BrowserType::Firefox, BrowserOptions|null $options = null, Origin|null $origin = null): BrowserSession
+    public function createBrowser(BrowserType $type = BrowserType::Firefox, BrowserOptions|null $options = null): BrowserSession
     {
-        return $this->browserRuntime->createBrowser(rtrim($this->uri(origin: $origin), '/'), $type, $options);
+        return $this->browserRuntime->createBrowser(rtrim($this->uri(), '/'), $type, $options);
     }
 
-    public function createBackendBrowser(BrowserType $type = BrowserType::Firefox, BrowserOptions|null $options = null, Origin|null $origin = null): BackendBrowser
+    public function createBackendBrowser(BrowserType $type = BrowserType::Firefox, BrowserOptions|null $options = null): BackendBrowser
     {
-        return new BackendBrowser($this->createBrowser($type, $options, $origin));
+        return new BackendBrowser($this->createBrowser($type, $options));
     }
 
     public function browserRuntime(): BrowserRuntime
