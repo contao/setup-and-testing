@@ -34,11 +34,12 @@ final class ApplicationConfig implements ApplicationConfigInterface
         return new self(rtrim($baseUri, '/'));
     }
 
-    public function createApplication(): Application
+    public function createApplication(ApplicationRuntime $runtime): Application
     {
         return new Application(
             $this,
             new BrowserRuntime($this->traceDirectory, new PlaywrightManager()),
+            $runtime,
         );
     }
 

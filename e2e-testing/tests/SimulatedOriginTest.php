@@ -14,6 +14,7 @@ namespace Contao\E2eTesting\Tests;
 
 use Composer\Autoload\ClassLoader;
 use Contao\E2eTesting\Application\ApplicationConfig;
+use Contao\E2eTesting\Application\ApplicationRuntime;
 use Contao\E2eTesting\Application\LocalApplicationConfig;
 use Contao\E2eTesting\Browser\BrowserRuntime;
 use Contao\E2eTesting\Browser\PlaywrightManager;
@@ -154,7 +155,7 @@ final class SimulatedOriginTest extends TestCase
     {
         $this->application->release();
         $this->application = $this->application(false);
-        $application = ApplicationConfig::create($this->application->uri())->createApplication();
+        $application = ApplicationConfig::create($this->application->uri())->createApplication(ApplicationRuntime::shared());
 
         try {
             $browser = $application->createHttpBrowser(HttpBrowserOptions::create()->withSimulatedOrigin('https://example.local'));
@@ -170,7 +171,7 @@ final class SimulatedOriginTest extends TestCase
 
     public function testBrowserKitDoesNotForwardSimulatedHeadersToAnotherServer(): void
     {
-        $other = LocalApplicationConfig::php($this->directory.'/installation/project')->createApplication();
+        $other = LocalApplicationConfig::php($this->directory.'/installation/project')->createApplication(ApplicationRuntime::shared());
 
         try {
             $browser = $this->application->createHttpBrowser(HttpBrowserOptions::create()->withSimulatedOrigin('https://example.local'));
@@ -205,6 +206,7 @@ final class SimulatedOriginTest extends TestCase
             new ManagedEditionState($installation, $config, new ContaoConsole(new ProcessRunner())),
             new ServerManager(),
             new BrowserRuntime($this->directory.'/traces', new PlaywrightManager()),
+            ApplicationRuntime::shared(),
         );
     }
 

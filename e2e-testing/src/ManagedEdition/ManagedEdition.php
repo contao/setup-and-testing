@@ -13,6 +13,7 @@ declare(strict_types=1);
 namespace Contao\E2eTesting\ManagedEdition;
 
 use Contao\E2eTesting\Application\ApplicationInterface;
+use Contao\E2eTesting\Application\ApplicationRuntime;
 use Contao\E2eTesting\Application\HttpApplicationTrait;
 use Contao\E2eTesting\Browser\BackendBrowser;
 use Contao\E2eTesting\Browser\BrowserOptions;
@@ -42,12 +43,18 @@ final class ManagedEdition implements ApplicationInterface
         private readonly ManagedEditionState $state,
         private readonly ServerManager $serverManager,
         private readonly BrowserRuntime $browserRuntime,
+        private readonly ApplicationRuntime $runtime,
     ) {
     }
 
     public function __destruct()
     {
         $this->release();
+    }
+
+    public function runtime(): ApplicationRuntime
+    {
+        return $this->runtime;
     }
 
     public function directory(): string

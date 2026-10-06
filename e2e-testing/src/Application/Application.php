@@ -25,8 +25,14 @@ final class Application implements ApplicationInterface
     public function __construct(
         private readonly ApplicationConfig $config,
         private readonly BrowserRuntime $browserRuntime,
+        private readonly ApplicationRuntime $runtime,
         private readonly WebServerProcess|null $server = null,
     ) {
+    }
+
+    public function runtime(): ApplicationRuntime
+    {
+        return $this->runtime;
     }
 
     public function createBrowser(BrowserType $type = BrowserType::Firefox, BrowserOptions|null $options = null): BrowserSession

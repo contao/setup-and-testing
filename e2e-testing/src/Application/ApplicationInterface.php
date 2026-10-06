@@ -23,6 +23,8 @@ use Symfony\Contracts\HttpClient\ResponseInterface;
 
 interface ApplicationInterface
 {
+    public function runtime(): ApplicationRuntime;
+
     public function createBrowser(BrowserType $type = BrowserType::Firefox, BrowserOptions|null $options = null): BrowserSession;
 
     public function createHttpBrowser(HttpBrowserOptions|null $options = null): HttpBrowser;

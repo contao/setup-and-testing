@@ -14,6 +14,7 @@ namespace Contao\E2eTesting\Tests;
 
 use Contao\E2eTesting\Application\ApplicationConfig;
 use Contao\E2eTesting\Application\ApplicationInterface;
+use Contao\E2eTesting\Application\ApplicationRuntime;
 use Contao\E2eTesting\Application\LocalApplicationConfig;
 use Contao\E2eTesting\Http\HttpRequest;
 use PHPUnit\Framework\TestCase;
@@ -50,7 +51,7 @@ final class ApplicationHttpTest extends TestCase
                 'body' => file_get_contents('php://input'),
             ]);
             PHP);
-        $this->application = LocalApplicationConfig::php($this->directory)->createApplication();
+        $this->application = LocalApplicationConfig::php($this->directory)->createApplication(ApplicationRuntime::shared());
     }
 
     protected function tearDown(): void
@@ -79,7 +80,7 @@ final class ApplicationHttpTest extends TestCase
 
     public function testExistingApplicationUrlPreservesItsSubdirectory(): void
     {
-        $application = ApplicationConfig::create($this->application->uri().'app')->createApplication();
+        $application = ApplicationConfig::create($this->application->uri().'app')->createApplication(ApplicationRuntime::shared());
 
         try {
             $values = $application->send(HttpRequest::get('/endpoint?test=1'))->toArray(false);
@@ -135,7 +136,7 @@ final class ApplicationHttpTest extends TestCase
             echo 'protected';
             PHP);
         $uri = str_replace('http://', 'http://test%2Buser:p%40ss%3Aword@', $this->application->uri());
-        $application = ApplicationConfig::create($uri)->createApplication();
+        $application = ApplicationConfig::create($uri)->createApplication(ApplicationRuntime::shared());
 
         try {
             $this->assertSame(200, $application->send(HttpRequest::get('/protected.php'))->getStatusCode());
@@ -156,8 +157,8 @@ final class ApplicationHttpTest extends TestCase
     public function testBrowserKitDoesNotSendUrlCredentialsToAnotherServer(): void
     {
         $uri = str_replace('http://', 'http://test-user:test-password@', $this->application->uri());
-        $application = ApplicationConfig::create($uri)->createApplication();
-        $other = LocalApplicationConfig::php($this->directory)->createApplication();
+        $application = ApplicationConfig::create($uri)->createApplication(ApplicationRuntime::shared());
+        $other = LocalApplicationConfig::php($this->directory)->createApplication(ApplicationRuntime::shared());
 
         try {
             $browser = $application->createHttpBrowser();
@@ -197,7 +198,7 @@ final class ApplicationHttpTest extends TestCase
     public function testCustomRoutersReceiveTheHostHeader(): void
     {
         (new Filesystem())->dumpFile($this->directory.'/router.php', '<?php echo $_SERVER["HTTP_HOST"];');
-        $application = LocalApplicationConfig::php($this->directory, router: 'router.php')->createApplication();
+        $application = LocalApplicationConfig::php($this->directory, router: 'router.php')->createApplication(ApplicationRuntime::shared());
 
         try {
             $response = $application->send(HttpRequest::get('/')->withHeader('Host', 'example.test'));

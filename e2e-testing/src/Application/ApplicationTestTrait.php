@@ -32,7 +32,7 @@ trait ApplicationTestTrait
     #[BeforeClass]
     public static function createApplication(): void
     {
-        self::$application = static::createApplicationConfig()->createApplication();
+        self::$application = ApplicationRuntime::shared()->createApplication(static::createApplicationConfig());
         self::$applicationFresh = true;
     }
 

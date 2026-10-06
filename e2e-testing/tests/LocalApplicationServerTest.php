@@ -14,6 +14,7 @@ namespace Contao\E2eTesting\Tests;
 
 use Contao\E2eTesting\Application\Application;
 use Contao\E2eTesting\Application\ApplicationConfig;
+use Contao\E2eTesting\Application\ApplicationRuntime;
 use Contao\E2eTesting\Application\LocalApplicationConfig;
 use Contao\E2eTesting\Browser\BrowserRuntime;
 use Contao\E2eTesting\Browser\BrowserSession;
@@ -121,7 +122,7 @@ class LocalApplicationServerTest extends TestCase
             ->method('create')
             ->willReturn($session)
         ;
-        $application = new Application(ApplicationConfig::create($server->baseUri), new BrowserRuntime('/unused', $factory), $server);
+        $application = new Application(ApplicationConfig::create($server->baseUri), new BrowserRuntime('/unused', $factory), ApplicationRuntime::shared(), $server);
 
         try {
             $this->assertSame($server->baseUri.'/login', $application->createBrowser()->uri('/login'));
@@ -163,7 +164,7 @@ class LocalApplicationServerTest extends TestCase
             ->method('close')
             ->willThrowException(new \RuntimeException('browser cleanup failed'))
         ;
-        $application = new Application(ApplicationConfig::create($server->baseUri), new BrowserRuntime('/unused', $factory), $server);
+        $application = new Application(ApplicationConfig::create($server->baseUri), new BrowserRuntime('/unused', $factory), ApplicationRuntime::shared(), $server);
 
         try {
             $application->release();
@@ -201,9 +202,11 @@ class LocalApplicationServerTest extends TestCase
         $config = LocalApplicationConfig::command([PHP_BINARY, 'server.php', '{port}'], $this->directory)
             ->withEnvironment(['LOCAL_TEST_ENV' => 'test'])
         ;
-        $application = $config->createApplication();
+        $runtime = ApplicationRuntime::create();
+        $application = $runtime->createApplication($config);
 
         try {
+            $this->assertSame($runtime, $application->runtime());
             $metadata = json_decode((string) file_get_contents($this->directory.'/server.json'), true, flags: JSON_THROW_ON_ERROR);
             $this->assertSame('test', $metadata['env']);
             $port = $metadata['port'];

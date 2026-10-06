@@ -14,5 +14,5 @@ namespace Contao\E2eTesting\Application;
 
 interface ApplicationConfigInterface
 {
-    public function createApplication(): ApplicationInterface;
+    public function createApplication(ApplicationRuntime $runtime): ApplicationInterface;
 }

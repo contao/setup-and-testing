@@ -12,6 +12,7 @@ declare(strict_types=1);
 
 namespace Contao\E2eTesting\ManagedEdition;
 
+use Contao\E2eTesting\Application\ApplicationRuntime;
 use Contao\E2eTesting\Browser\BrowserRuntime;
 use Contao\E2eTesting\Browser\PlaywrightManager;
 use Contao\E2eTesting\Cache\FingerprintCalculator;
@@ -26,7 +27,6 @@ use Contao\E2eTesting\Installation\InstallationWorkspace;
 use Contao\E2eTesting\Installation\PreparedInstallation;
 use Contao\E2eTesting\Process\ContaoConsole;
 use Contao\E2eTesting\Process\ProcessRunner;
-use Contao\InstallationRecipe\Cache\InMemoryCache;
 use Contao\InstallationRecipe\Fixture\FixtureLoader;
 use Contao\InstallationRecipe\Fixture\FixtureParser;
 use Contao\InstallationRecipe\Fixture\FixtureValueResolver;
@@ -38,7 +38,7 @@ final readonly class ManagedEditionFactory
         private ManagedEditionRuntime $runtime,
         private FingerprintCalculator $fingerprintCalculator,
         private InstallationPool $installationPool,
-        private InMemoryCache $cache,
+        private ApplicationRuntime $applicationRuntime,
     ) {
     }
 
@@ -63,7 +63,7 @@ final readonly class ManagedEditionFactory
             new ComposerInstaller($processRunner),
             new ApplicationPreparer(),
             $console,
-            $this->cache->scope($database->connection()),
+            $this->applicationRuntime->cache->scope($database->connection()),
         );
 
         try {
@@ -79,12 +79,13 @@ final readonly class ManagedEditionFactory
             new ManagedEditionState($installation, $config, $console),
             new ServerManager(appEnvironment: $config->appEnvironment),
             new BrowserRuntime(Path::join($cache->rootDirectory, 'traces'), new PlaywrightManager()),
+            $this->applicationRuntime,
         );
     }
 
     private function createDatabase(DatabaseServerConfig $server, string $name): DatabaseManager
     {
-        $cache = $this->cache;
+        $cache = $this->applicationRuntime->cache;
         $fixtures = new FixtureLoader(new FixtureParser($cache), new FixtureValueResolver(), $cache);
 
         return new DatabaseManager($server, $name, $fixtures);

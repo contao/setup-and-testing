@@ -16,6 +16,7 @@ use Contao\E2eTesting\Application\Application;
 use Contao\E2eTesting\Application\ApplicationConfig;
 use Contao\E2eTesting\Application\ApplicationConfigInterface;
 use Contao\E2eTesting\Application\ApplicationInterface;
+use Contao\E2eTesting\Application\ApplicationRuntime;
 use Contao\E2eTesting\Application\ApplicationTestTrait;
 use PHPUnit\Framework\TestCase;
 
@@ -64,9 +65,9 @@ class ApplicationTestTraitTest extends TestCase
             {
             }
 
-            public function createApplication(): ApplicationInterface
+            public function createApplication(ApplicationRuntime $runtime): ApplicationInterface
             {
-                return $this->application ?? ApplicationConfig::create('http://localhost:8080')->createApplication();
+                return $this->application ?? ApplicationConfig::create('http://localhost:8080')->createApplication($runtime);
             }
         };
     }

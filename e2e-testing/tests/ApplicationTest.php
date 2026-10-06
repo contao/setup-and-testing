@@ -14,6 +14,7 @@ namespace Contao\E2eTesting\Tests;
 
 use Contao\E2eTesting\Application\Application;
 use Contao\E2eTesting\Application\ApplicationConfig;
+use Contao\E2eTesting\Application\ApplicationRuntime;
 use Contao\E2eTesting\Browser\BackendBrowser;
 use Contao\E2eTesting\Browser\BrowserOptions;
 use Contao\E2eTesting\Browser\BrowserRuntime;
@@ -44,7 +45,7 @@ class ApplicationTest extends TestCase
             ->with(BrowserType::Firefox, $uri, $this->isInstanceOf(BrowserOptions::class))
             ->willReturn($session)
         ;
-        $application = new Application(ApplicationConfig::create($server->baseUri.'/app'), new BrowserRuntime('/unused', $factory), $server);
+        $application = new Application(ApplicationConfig::create($server->baseUri.'/app'), new BrowserRuntime('/unused', $factory), ApplicationRuntime::shared(), $server);
 
         try {
             $this->assertSame($session, $application->createBrowser());
@@ -77,7 +78,7 @@ class ApplicationTest extends TestCase
             ->expects($this->once())
             ->method('close')
         ;
-        $application = new Application(ApplicationConfig::create('http://localhost:8080'), new BrowserRuntime('/unused', $factory));
+        $application = new Application(ApplicationConfig::create('http://localhost:8080'), new BrowserRuntime('/unused', $factory), ApplicationRuntime::shared());
 
         $backend = new BackendBrowser($application->createBrowser(options: $options));
         $this->assertSame($session, $backend->browser());

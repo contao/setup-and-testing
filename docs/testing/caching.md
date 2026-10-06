@@ -11,9 +11,25 @@ Managed Edition tests reuse installations to make later runs faster. Each projec
 | Package source or application configuration | Rerun application setup and migrations |
 | Fixture contents only | Reset and reload the database |
 
-Parallel processes use separate installation and database slots. Source fingerprints are cached for the PHPUnit process, so edit package code between runs. Specialized tests that change source during a run can call `ProcessCachedSourceFingerprint::reset()`.
+Parallel processes use separate installation and database slots. Source fingerprints are cached for the application runtime. Tests that change source during a run can call `$application->runtime()->cache->clear()` before recalculating them.
 
 The Playwright process and browser engine are reused within each test class in both modes. Browser contexts have independent cookies and storage and are closed between tests. See [browsers and assertions](browsers.md).
+
+## Share an in-memory cache
+
+An application runtime owns a cache that any service can use. PHPUnit application tests use a shared process runtime. Create an explicit runtime to give a group of applications its own cache:
+
+```php
+use Contao\E2eTesting\Application\ApplicationConfig;
+use Contao\E2eTesting\Application\ApplicationRuntime;
+
+$runtime = ApplicationRuntime::create();
+$first = $runtime->createApplication(ApplicationConfig::create('http://localhost:8080'));
+$second = $runtime->createApplication(ApplicationConfig::create('http://localhost:8081'));
+$runtime->cache->set('custom.value', 'shared');
+```
+
+This works with all application configurations, including Managed Edition and local servers. The cache survives application resets and release while the runtime remains in use. Call `$runtime->cache->clear()` to clear its values. Database migrations invalidate only their connection scope, leaving parsed fixtures and source fingerprints available to other applications. Separate runtimes have separate caches.
 
 ## Restore database fixtures
 

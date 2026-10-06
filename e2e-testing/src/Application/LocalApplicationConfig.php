@@ -61,7 +61,7 @@ final class LocalApplicationConfig implements ApplicationConfigInterface
         return $clone;
     }
 
-    public function createApplication(): Application
+    public function createApplication(ApplicationRuntime $runtime): Application
     {
         $server = (new WebServerManager())->start($this->server);
 
@@ -71,6 +71,7 @@ final class LocalApplicationConfig implements ApplicationConfigInterface
             return new Application(
                 $config,
                 new BrowserRuntime($this->traceDirectory, new PlaywrightManager()),
+                $runtime,
                 $server,
             );
         } catch (\Throwable $exception) {

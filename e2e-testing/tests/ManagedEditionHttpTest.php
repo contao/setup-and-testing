@@ -12,6 +12,8 @@ declare(strict_types=1);
 
 namespace Contao\E2eTesting\Tests;
 
+use Contao\E2eTesting\Application\ApplicationConfig;
+use Contao\E2eTesting\Application\ApplicationRuntime;
 use Contao\E2eTesting\Browser\BrowserRuntime;
 use Contao\E2eTesting\Browser\PlaywrightManager;
 use Contao\E2eTesting\Cache\FingerprintSet;
@@ -139,6 +141,21 @@ final class ManagedEditionHttpTest extends TestCase
         $this->assertSame(422, $browser->getInternalResponse()->getStatusCode());
     }
 
+    public function testSharesRuntimeCacheWithRegularApplications(): void
+    {
+        $runtime = $this->application->runtime();
+        $other = $runtime->createApplication(ApplicationConfig::create('http://localhost:8080'));
+
+        try {
+            $runtime->cache->set('custom.value', 'shared');
+
+            $this->assertSame($runtime, $other->runtime());
+            $this->assertSame('shared', $other->runtime()->cache->get('custom.value'));
+        } finally {
+            $other->release();
+        }
+    }
+
     private function application(): ManagedEdition
     {
         $installation = new PreparedInstallation(
@@ -156,6 +173,7 @@ final class ManagedEditionHttpTest extends TestCase
             ),
             new ServerManager(),
             new BrowserRuntime($this->directory.'/traces', new PlaywrightManager()),
+            ApplicationRuntime::shared(),
         );
     }
 
