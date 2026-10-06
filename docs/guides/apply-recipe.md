@@ -24,7 +24,7 @@ require __DIR__.'/vendor/autoload.php';
 use Contao\InstallationRecipe\Archive\RecipeArchive;
 use Contao\InstallationRecipe\Installation\InstallationRuntimeInterface;
 use Contao\InstallationRecipe\Installation\InstallationTarget;
-use Contao\InstallationRecipe\Installation\RecipeInstaller;
+use Contao\InstallationRecipe\Installation\RecipeInstallerFactory;
 use Doctrine\DBAL\DriverManager;
 use Doctrine\DBAL\Tools\DsnParser;
 use Symfony\Component\Process\Process;
@@ -65,7 +65,7 @@ try {
 
     try {
         $target = new InstallationTarget(__DIR__, $connection, $runtime);
-        $installer = new RecipeInstaller();
+        $installer = (new RecipeInstallerFactory())->create();
         $plan = $installer->plan($archive->recipe, $target);
         echo json_encode($plan->changes, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR)."\n";
         echo "Apply this recipe from its trusted publisher? Type yes: ";

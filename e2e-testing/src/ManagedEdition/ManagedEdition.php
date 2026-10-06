@@ -19,7 +19,6 @@ use Contao\E2eTesting\Browser\BrowserOptions;
 use Contao\E2eTesting\Browser\BrowserRuntime;
 use Contao\E2eTesting\Browser\BrowserSession;
 use Contao\E2eTesting\Browser\BrowserType;
-use Contao\E2eTesting\Browser\PlaywrightManager;
 use Contao\E2eTesting\Database\DatabaseManager;
 use Contao\E2eTesting\Database\DatabaseResetMode;
 use Contao\E2eTesting\Http\ServerManager;
@@ -35,21 +34,15 @@ final class ManagedEdition implements ApplicationInterface
 
     private ServerProcess|null $server = null;
 
-    private readonly BrowserRuntime $browserRuntime;
-
     private string|null $preparedFixtureFingerprint = null;
 
     private FixtureResult|null $preparedFixtureResult = null;
 
     public function __construct(
         private readonly ManagedEditionState $state,
-        private readonly ServerManager $serverManager = new ServerManager(),
-        PlaywrightManager $playwrightManager = new PlaywrightManager(),
+        private readonly ServerManager $serverManager,
+        private readonly BrowserRuntime $browserRuntime,
     ) {
-        $this->browserRuntime = new BrowserRuntime(
-            Path::join($this->state->config->environment->cache->rootDirectory, 'traces'),
-            $playwrightManager,
-        );
     }
 
     public function __destruct()

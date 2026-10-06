@@ -18,8 +18,8 @@ use Contao\InstallationRecipe\Fixture\FixtureLoader;
 final readonly class InstallationContentInstallers
 {
     public function __construct(
-        public FixtureLoader $fixtures = new FixtureLoader(),
-        public FileInstaller $files = new FileInstaller(),
+        public FixtureLoader $fixtures,
+        public FileInstaller $files,
     ) {
     }
 }

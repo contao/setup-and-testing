@@ -27,7 +27,7 @@ final class BrowserRuntime
 
     public function __construct(
         private readonly string $traceDirectory,
-        private readonly BrowserSessionFactoryInterface $sessionFactory = new PlaywrightManager(),
+        private readonly BrowserSessionFactoryInterface $sessionFactory,
     ) {
     }
 

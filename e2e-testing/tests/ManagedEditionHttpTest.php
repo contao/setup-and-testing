@@ -12,10 +12,13 @@ declare(strict_types=1);
 
 namespace Contao\E2eTesting\Tests;
 
+use Contao\E2eTesting\Browser\BrowserRuntime;
+use Contao\E2eTesting\Browser\PlaywrightManager;
 use Contao\E2eTesting\Cache\FingerprintSet;
 use Contao\E2eTesting\Database\DatabaseManager;
 use Contao\E2eTesting\Database\DatabaseServerConfig;
 use Contao\E2eTesting\Http\HttpRequest;
+use Contao\E2eTesting\Http\ServerManager;
 use Contao\E2eTesting\Installation\InstallationLease;
 use Contao\E2eTesting\Installation\PreparedInstallation;
 use Contao\E2eTesting\ManagedEdition\ManagedEdition;
@@ -24,6 +27,9 @@ use Contao\E2eTesting\ManagedEdition\ManagedEditionState;
 use Contao\E2eTesting\Process\ContaoConsole;
 use Contao\E2eTesting\Process\ProcessRunner;
 use Contao\InstallationRecipe\Composer\ComposerConfig;
+use Contao\InstallationRecipe\Fixture\FixtureLoader;
+use Contao\InstallationRecipe\Fixture\FixtureParser;
+use Contao\InstallationRecipe\Fixture\FixtureValueResolver;
 use Contao\InstallationRecipe\Recipe\InstallationRecipe;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
@@ -136,15 +142,24 @@ final class ManagedEditionHttpTest extends TestCase
     {
         $installation = new PreparedInstallation(
             new InstallationLease($this->directory.'/installation', 0, null),
-            new DatabaseManager(new DatabaseServerConfig('mysql://localhost'), 'unused'),
+            new DatabaseManager(new DatabaseServerConfig('mysql://localhost'), 'unused', $this->fixtureLoader()),
             new FingerprintSet('http-test', 'http-test', 'http-test'),
         );
         $recipe = InstallationRecipe::create(ComposerConfig::managedEdition('^5.7'));
 
-        return new ManagedEdition(new ManagedEditionState(
-            $installation,
-            ManagedEditionConfig::create($recipe, $this->directory),
-            new ContaoConsole(new ProcessRunner()),
-        ));
+        return new ManagedEdition(
+            new ManagedEditionState(
+                $installation,
+                ManagedEditionConfig::create($recipe, $this->directory),
+                new ContaoConsole(new ProcessRunner()),
+            ),
+            new ServerManager(),
+            new BrowserRuntime($this->directory.'/traces', new PlaywrightManager()),
+        );
+    }
+
+    private function fixtureLoader(): FixtureLoader
+    {
+        return new FixtureLoader(new FixtureParser(), new FixtureValueResolver());
     }
 }

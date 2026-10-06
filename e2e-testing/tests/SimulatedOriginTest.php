@@ -15,11 +15,14 @@ namespace Contao\E2eTesting\Tests;
 use Composer\Autoload\ClassLoader;
 use Contao\E2eTesting\Application\ApplicationConfig;
 use Contao\E2eTesting\Application\LocalApplicationConfig;
+use Contao\E2eTesting\Browser\BrowserRuntime;
+use Contao\E2eTesting\Browser\PlaywrightManager;
 use Contao\E2eTesting\Cache\FingerprintSet;
 use Contao\E2eTesting\Database\DatabaseManager;
 use Contao\E2eTesting\Database\DatabaseServerConfig;
 use Contao\E2eTesting\Http\HttpBrowserOptions;
 use Contao\E2eTesting\Http\HttpRequest;
+use Contao\E2eTesting\Http\ServerManager;
 use Contao\E2eTesting\Installation\ApplicationPreparer;
 use Contao\E2eTesting\Installation\InstallationLease;
 use Contao\E2eTesting\Installation\PreparedInstallation;
@@ -29,6 +32,9 @@ use Contao\E2eTesting\ManagedEdition\ManagedEditionState;
 use Contao\E2eTesting\Process\ContaoConsole;
 use Contao\E2eTesting\Process\ProcessRunner;
 use Contao\InstallationRecipe\Composer\ComposerConfig;
+use Contao\InstallationRecipe\Fixture\FixtureLoader;
+use Contao\InstallationRecipe\Fixture\FixtureParser;
+use Contao\InstallationRecipe\Fixture\FixtureValueResolver;
 use Contao\InstallationRecipe\Recipe\InstallationRecipe;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
@@ -184,7 +190,7 @@ final class SimulatedOriginTest extends TestCase
         $lease = new InstallationLease($this->directory.'/installation', 0, null);
         $installation = new PreparedInstallation(
             $lease,
-            new DatabaseManager(new DatabaseServerConfig('mysql://localhost'), 'unused'),
+            new DatabaseManager(new DatabaseServerConfig('mysql://localhost'), 'unused', $this->fixtureLoader()),
             new FingerprintSet('origin', 'origin', 'origin'),
         );
         $config = ManagedEditionConfig::create(InstallationRecipe::create(ComposerConfig::managedEdition('^5.7')), $this->directory);
@@ -194,7 +200,11 @@ final class SimulatedOriginTest extends TestCase
         (new ApplicationPreparer())->prepare($config, $installation->directory(), null);
         $this->writeFrontController($installation->directory());
 
-        return new ManagedEdition(new ManagedEditionState($installation, $config, new ContaoConsole(new ProcessRunner())));
+        return new ManagedEdition(
+            new ManagedEditionState($installation, $config, new ContaoConsole(new ProcessRunner())),
+            new ServerManager(),
+            new BrowserRuntime($this->directory.'/traces', new PlaywrightManager()),
+        );
     }
 
     private function writeFrontController(string $directory): void
@@ -232,5 +242,10 @@ final class SimulatedOriginTest extends TestCase
             ]);
             PHP;
         (new Filesystem())->dumpFile($directory.'/public/index.php', '<?php require '.$autoload.';'.$source);
+    }
+
+    private function fixtureLoader(): FixtureLoader
+    {
+        return new FixtureLoader(new FixtureParser(), new FixtureValueResolver());
     }
 }

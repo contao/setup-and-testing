@@ -14,7 +14,9 @@ namespace Contao\InstallationRecipe\Tests;
 
 use Contao\InstallationRecipe\Exception\InvalidRecipeException;
 use Contao\InstallationRecipe\Fixture\FixtureLoader;
+use Contao\InstallationRecipe\Fixture\FixtureParser;
 use Contao\InstallationRecipe\Fixture\FixtureSet;
+use Contao\InstallationRecipe\Fixture\FixtureValueResolver;
 use Doctrine\DBAL\DriverManager;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Filesystem\Filesystem;
@@ -27,7 +29,7 @@ final class FixtureLoaderTest extends TestCase
         $connection = DriverManager::getConnection(['driver' => 'pdo_sqlite', 'memory' => true]);
         $connection->executeStatement('CREATE TABLE example (id INTEGER PRIMARY KEY, title TEXT NOT NULL)');
 
-        (new FixtureLoader())->load($connection, new FixtureSet([$fixture]));
+        $this->fixtureLoader()->load($connection, new FixtureSet([$fixture]));
 
         $this->assertSame([['id' => 1, 'title' => 'Hello']], $connection->fetchAllAssociative('SELECT * FROM example'));
     }
@@ -47,7 +49,7 @@ final class FixtureLoaderTest extends TestCase
         $connection->executeStatement('CREATE TABLE example (id INTEGER PRIMARY KEY AUTOINCREMENT, parent_id INTEGER NOT NULL, title TEXT NOT NULL)');
         $connection->insert('example', ['parent_id' => 0, 'title' => 'Existing row']);
 
-        $result = (new FixtureLoader())->load($connection, new FixtureSet([$fixture]));
+        $result = $this->fixtureLoader()->load($connection, new FixtureSet([$fixture]));
 
         $this->assertSame(2, (int) $result->value('parent'));
         $this->assertSame(3, (int) $result->value('child'));
@@ -79,7 +81,7 @@ final class FixtureLoaderTest extends TestCase
         $connection->executeStatement('CREATE TABLE source (id INTEGER PRIMARY KEY AUTOINCREMENT, label TEXT NOT NULL)');
         $connection->executeStatement('CREATE TABLE dependent (id INTEGER PRIMARY KEY AUTOINCREMENT, source_id INTEGER NOT NULL, label TEXT NOT NULL)');
 
-        (new FixtureLoader())->load($connection, new FixtureSet([$dependentFixture, $sourceFixture]));
+        $this->fixtureLoader()->load($connection, new FixtureSet([$dependentFixture, $sourceFixture]));
 
         $this->assertSame(
             [['id' => 1, 'source_id' => 1, 'label' => 'Source']],
@@ -93,7 +95,7 @@ final class FixtureLoaderTest extends TestCase
         $connection = DriverManager::getConnection(['driver' => 'pdo_sqlite', 'memory' => true]);
         $connection->executeStatement('CREATE TABLE example (id INTEGER PRIMARY KEY AUTOINCREMENT, value TEXT NOT NULL)');
 
-        (new FixtureLoader())->load($connection, new FixtureSet([$fixture]));
+        $this->fixtureLoader()->load($connection, new FixtureSet([$fixture]));
 
         $this->assertSame('@literal', $connection->fetchOne('SELECT value FROM example'));
     }
@@ -112,7 +114,7 @@ final class FixtureLoaderTest extends TestCase
         $connection = DriverManager::getConnection(['driver' => 'pdo_sqlite', 'memory' => true]);
         $connection->executeStatement('CREATE TABLE example (id INTEGER PRIMARY KEY AUTOINCREMENT, related TEXT NOT NULL)');
 
-        (new FixtureLoader())->load($connection, new FixtureSet([$fixture]));
+        $this->fixtureLoader()->load($connection, new FixtureSet([$fixture]));
 
         $this->assertSame(['1', 'literal'], unserialize($connection->fetchOne('SELECT related FROM example WHERE id = 2')));
     }
@@ -134,7 +136,7 @@ final class FixtureLoaderTest extends TestCase
         $connection = DriverManager::getConnection(['driver' => 'pdo_sqlite', 'memory' => true]);
         $connection->executeStatement('CREATE TABLE example (id INTEGER PRIMARY KEY AUTOINCREMENT, options TEXT NOT NULL)');
 
-        (new FixtureLoader())->load($connection, new FixtureSet([$fixture]));
+        $this->fixtureLoader()->load($connection, new FixtureSet([$fixture]));
 
         $this->assertSame(
             ['parent' => '1', 'enabled' => true, 'values' => ['first', 'second']],
@@ -150,7 +152,7 @@ final class FixtureLoaderTest extends TestCase
         $this->expectException(InvalidRecipeException::class);
         $this->expectExceptionMessage('The fixture value tag "!xml"');
 
-        (new FixtureLoader())->load($connection, new FixtureSet([$fixture]));
+        $this->fixtureLoader()->load($connection, new FixtureSet([$fixture]));
     }
 
     public function testRollsBackUnresolvableReferences(): void
@@ -166,7 +168,7 @@ final class FixtureLoaderTest extends TestCase
         $connection->executeStatement('CREATE TABLE example (id INTEGER PRIMARY KEY AUTOINCREMENT, parent_id INTEGER NOT NULL)');
 
         try {
-            (new FixtureLoader())->load($connection, new FixtureSet([$fixture]));
+            $this->fixtureLoader()->load($connection, new FixtureSet([$fixture]));
             $this->fail('Expected the unresolved fixture reference to throw an exception.');
         } catch (InvalidRecipeException $exception) {
             $this->assertSame('Fixture dependencies cannot be resolved: missing.', $exception->getMessage());
@@ -190,7 +192,7 @@ final class FixtureLoaderTest extends TestCase
         $this->expectException(InvalidRecipeException::class);
         $this->expectExceptionMessage('Fixture dependencies cannot be resolved: second, first.');
 
-        (new FixtureLoader())->load($connection, new FixtureSet([$fixture]));
+        $this->fixtureLoader()->load($connection, new FixtureSet([$fixture]));
     }
 
     public function testRejectsDuplicateFixtureNames(): void
@@ -202,13 +204,13 @@ final class FixtureLoaderTest extends TestCase
         $this->expectException(InvalidRecipeException::class);
         $this->expectExceptionMessage('The fixture name "duplicate" is defined more than once.');
 
-        (new FixtureLoader())->load($connection, new FixtureSet([$firstFixture, $secondFixture]));
+        $this->fixtureLoader()->load($connection, new FixtureSet([$firstFixture, $secondFixture]));
     }
 
     public function testRejectsUnknownFixturesWhileInterpolating(): void
     {
         $connection = DriverManager::getConnection(['driver' => 'pdo_sqlite', 'memory' => true]);
-        $result = (new FixtureLoader())->load($connection, FixtureSet::empty());
+        $result = $this->fixtureLoader()->load($connection, FixtureSet::empty());
 
         $this->expectException(InvalidRecipeException::class);
         $this->expectExceptionMessage('The fixture "missing" does not exist.');
@@ -221,7 +223,7 @@ final class FixtureLoaderTest extends TestCase
         $fixture = $this->fixture("sql:\n  - DROP TABLE example\n");
 
         $this->expectException(InvalidRecipeException::class);
-        (new FixtureLoader())->load(DriverManager::getConnection(['driver' => 'pdo_sqlite', 'memory' => true]), new FixtureSet([$fixture]));
+        $this->fixtureLoader()->load(DriverManager::getConnection(['driver' => 'pdo_sqlite', 'memory' => true]), new FixtureSet([$fixture]));
     }
 
     private function fixture(string $contents): string
@@ -234,5 +236,10 @@ final class FixtureLoaderTest extends TestCase
         $filesystem->dumpFile($path, $contents);
 
         return $path;
+    }
+
+    private function fixtureLoader(): FixtureLoader
+    {
+        return new FixtureLoader(new FixtureParser(), new FixtureValueResolver());
     }
 }

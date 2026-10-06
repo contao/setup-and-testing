@@ -26,8 +26,9 @@ use Symfony\Component\Yaml\Yaml;
 final readonly class RecipeInstallationPlanner
 {
     public function __construct(
-        private PortableFilePolicy $files = new PortableFilePolicy(),
-        private InstallationPathValidator $paths = new InstallationPathValidator(),
+        private PortableFilePolicy $files,
+        private InstallationPathValidator $paths,
+        private FixtureParser $fixtures,
     ) {
     }
 
@@ -42,7 +43,7 @@ final readonly class RecipeInstallationPlanner
         $config = $this->documentDestination($directory, 'config/config.yaml');
         $journal = $this->documentDestination($directory, '.contao-recipes/'.str_replace('/', '--', $recipe->descriptor->name).'.json');
         $this->validateComposer($composer);
-        (new FixtureParser())->parse($recipe->content->fixtures);
+        $this->fixtures->parse($recipe->content->fixtures);
         (new FileInstaller())->withPolicy($this->files)->validate($recipe->content->assets->fileMappings, $directory);
         $fragments = array_map(static fn ($fragment) => $fragment->path, $recipe->content->assets->configFragments);
         $changes = [

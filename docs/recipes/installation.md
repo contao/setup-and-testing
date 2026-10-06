@@ -21,15 +21,12 @@ Overwriting application files requires an explicit host policy as well as the ma
 
 ```php
 use Contao\InstallationRecipe\File\PortableFilePolicy;
-use Contao\InstallationRecipe\Installation\RecipeInstallationPlanner;
-use Contao\InstallationRecipe\Installation\RecipeInstaller;
+use Contao\InstallationRecipe\Installation\RecipeInstallerFactory;
 
-$installer = new RecipeInstaller(
-    planner: new RecipeInstallationPlanner(
-        files: (new PortableFilePolicy())
-            ->withAllowedTargets(['files', 'contao/dca', 'config/services.php', 'templates'])
-            ->withOverwrite(true),
-    ),
+$installer = (new RecipeInstallerFactory())->create(
+    (new PortableFilePolicy())
+        ->withAllowedTargets(['files', 'contao/dca', 'config/services.php', 'templates'])
+        ->withOverwrite(true),
 );
 ```
 

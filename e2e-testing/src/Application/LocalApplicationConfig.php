@@ -12,6 +12,8 @@ declare(strict_types=1);
 
 namespace Contao\E2eTesting\Application;
 
+use Contao\E2eTesting\Browser\BrowserRuntime;
+use Contao\E2eTesting\Browser\PlaywrightManager;
 use Contao\E2eTesting\Http\WebServerConfig;
 use Contao\E2eTesting\Http\WebServerManager;
 
@@ -66,7 +68,11 @@ final class LocalApplicationConfig implements ApplicationConfigInterface
         try {
             $config = ApplicationConfig::create($server->baseUri)->withTraceDirectory($this->traceDirectory);
 
-            return new Application($config, server: $server);
+            return new Application(
+                $config,
+                new BrowserRuntime($this->traceDirectory, new PlaywrightManager()),
+                $server,
+            );
         } catch (\Throwable $exception) {
             $server->stop();
 

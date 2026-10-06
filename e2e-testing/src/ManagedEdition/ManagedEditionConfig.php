@@ -14,11 +14,14 @@ namespace Contao\E2eTesting\ManagedEdition;
 
 use Contao\E2eTesting\Application\ApplicationConfigInterface;
 use Contao\E2eTesting\Cache\CacheConfig;
+use Contao\E2eTesting\Cache\FingerprintCalculator;
+use Contao\E2eTesting\Cache\ProcessCachedSourceFingerprint;
 use Contao\E2eTesting\Database\DatabaseResetMode;
 use Contao\E2eTesting\Database\DatabaseServerConfig;
 use Contao\E2eTesting\Database\DockerDatabaseConfig;
 use Contao\E2eTesting\Database\DockerDatabaseService;
 use Contao\E2eTesting\Docker\DockerServiceInterface;
+use Contao\E2eTesting\Installation\InstallationPool;
 use Contao\InstallationRecipe\File\FileMapping;
 use Contao\InstallationRecipe\Recipe\InstallationRecipe;
 
@@ -42,7 +45,13 @@ final readonly class ManagedEditionConfig implements ApplicationConfigInterface
 
     public function createApplication(): ManagedEdition
     {
-        return (new ManagedEditionFactory())->create($this)->startServer();
+        $factory = new ManagedEditionFactory(
+            new ManagedEditionRuntime(),
+            new FingerprintCalculator(new ProcessCachedSourceFingerprint()),
+            new InstallationPool(),
+        );
+
+        return $factory->create($this)->startServer();
     }
 
     public function withEnvironment(ManagedEditionEnvironment $environment): self

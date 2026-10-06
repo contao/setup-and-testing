@@ -17,7 +17,7 @@ use Contao\InstallationRecipe\Composer\ComposerDependencies;
 use Contao\InstallationRecipe\Fixture\FixtureSet;
 use Contao\InstallationRecipe\Installation\InstallationRuntimeInterface;
 use Contao\InstallationRecipe\Installation\InstallationTarget;
-use Contao\InstallationRecipe\Installation\RecipeInstaller;
+use Contao\InstallationRecipe\Installation\RecipeInstallerFactory;
 use Contao\InstallationRecipe\Recipe\PortableInstallationRecipe;
 use Contao\InstallationRecipe\Recipe\RecipeAssets;
 use Contao\InstallationRecipe\Recipe\RecipeContent;
@@ -36,7 +36,7 @@ final class RecipeInstallerTest extends TestCase
         $connection = DriverManager::getConnection(['driver' => 'pdo_sqlite', 'memory' => true]);
         $runtime = $this->runtime($connection);
 
-        $installer = new RecipeInstaller();
+        $installer = (new RecipeInstallerFactory())->create();
         $target = new InstallationTarget($directory, $connection, $runtime);
         $plan = $installer->plan($archive->recipe, $target);
         $this->assertSame('^1.0', $plan->changes['composer']['require']['acme/theme-bundle']);
@@ -75,7 +75,7 @@ final class RecipeInstallerTest extends TestCase
         $archive = RecipeArchive::open($this->archive());
         $connection = DriverManager::getConnection(['driver' => 'pdo_sqlite', 'memory' => true]);
         $target = new InstallationTarget($directory, $connection, $this->runtime($connection));
-        $installer = new RecipeInstaller();
+        $installer = (new RecipeInstallerFactory())->create();
         $installer->install($installer->plan($archive->recipe, $target), $target);
         $this->assertTrue(is_link($directory.'/composer.json'));
         $this->assertTrue(is_link($directory.'/config'));
@@ -103,7 +103,7 @@ final class RecipeInstallerTest extends TestCase
             $connection = DriverManager::getConnection(['driver' => 'pdo_sqlite', 'memory' => true]);
             $runtime = $this->runtime($connection);
             $target = new InstallationTarget($directory, $connection, $runtime);
-            $installer = new RecipeInstaller();
+            $installer = (new RecipeInstallerFactory())->create();
             $result = $installer->install($installer->plan($recipe, $target), $target);
             $this->assertFalse($result->configurationChanged);
             $this->assertSame($configuration, file_get_contents($directory.'/config/config.yaml'));

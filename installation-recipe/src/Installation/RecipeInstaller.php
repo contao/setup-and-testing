@@ -19,9 +19,9 @@ use Symfony\Component\Filesystem\Path;
 final readonly class RecipeInstaller
 {
     public function __construct(
-        private InstallationDocumentInstallers $documents = new InstallationDocumentInstallers(),
-        private InstallationContentInstallers $content = new InstallationContentInstallers(),
-        private RecipeInstallationPlanner $planner = new RecipeInstallationPlanner(),
+        private InstallationDocumentInstallers $documents,
+        private InstallationContentInstallers $content,
+        private RecipeInstallationPlanner $planner,
     ) {
     }
 

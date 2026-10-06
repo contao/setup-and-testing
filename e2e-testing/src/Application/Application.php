@@ -22,14 +22,11 @@ final class Application implements ApplicationInterface
 {
     use HttpApplicationTrait;
 
-    private readonly BrowserRuntime $browserRuntime;
-
     public function __construct(
         private readonly ApplicationConfig $config,
-        BrowserRuntime|null $browserRuntime = null,
+        private readonly BrowserRuntime $browserRuntime,
         private readonly WebServerProcess|null $server = null,
     ) {
-        $this->browserRuntime = $browserRuntime ?? new BrowserRuntime($config->traceDirectory());
     }
 
     public function createBrowser(BrowserType $type = BrowserType::Firefox, BrowserOptions|null $options = null): BrowserSession

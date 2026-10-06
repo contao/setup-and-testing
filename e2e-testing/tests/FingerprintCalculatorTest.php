@@ -91,7 +91,7 @@ final class FingerprintCalculatorTest extends TestCase
         $directory = $this->createInputDirectory();
         $filesystem = new Filesystem();
         $config = $this->config($directory);
-        $calculator = new FingerprintCalculator();
+        $calculator = new FingerprintCalculator(new SourceFingerprint());
         $cache = $config->environment->cache;
         (new WorkspaceInitializer())->initialize($cache);
         $pool = new InstallationPool();

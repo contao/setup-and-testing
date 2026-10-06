@@ -31,7 +31,7 @@ final class DatabaseManager implements InstallationDatabaseInterface
     public function __construct(
         private readonly DatabaseServerConfig $config,
         private readonly string $databaseName,
-        private readonly FixtureLoader $fixtureLoader = new FixtureLoader(),
+        private readonly FixtureLoader $fixtureLoader,
     ) {
         $this->applicationUrl = DatabaseUrl::parse($config->url)->withDatabase($databaseName);
     }

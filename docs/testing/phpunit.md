@@ -77,4 +77,4 @@ The first test uses the freshly created application without calling `resetState(
 
 ## Use the tooling outside PHPUnit
 
-Outside PHPUnit, create an `Application` with its configuration, or call the configuration's `createApplication()`. Always call `release()` in a `finally` block. `BrowserRuntime` owns session tracking, current-page access, traces and cleanup. Your application implementation owns provisioning and other state.
+Outside PHPUnit, call the configuration's `createApplication()` to wire its services. Custom application construction requires an explicit `BrowserRuntime`. Always call `release()` in a `finally` block. `BrowserRuntime` owns session tracking, current-page access, traces and cleanup. Your application implementation owns provisioning and other state.

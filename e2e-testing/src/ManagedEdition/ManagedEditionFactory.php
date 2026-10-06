@@ -12,9 +12,12 @@ declare(strict_types=1);
 
 namespace Contao\E2eTesting\ManagedEdition;
 
+use Contao\E2eTesting\Browser\BrowserRuntime;
+use Contao\E2eTesting\Browser\PlaywrightManager;
 use Contao\E2eTesting\Cache\FingerprintCalculator;
 use Contao\E2eTesting\Composer\ComposerInstaller;
 use Contao\E2eTesting\Database\DatabaseManager;
+use Contao\E2eTesting\Database\DatabaseServerConfig;
 use Contao\E2eTesting\Http\ServerManager;
 use Contao\E2eTesting\Installation\ApplicationPreparer;
 use Contao\E2eTesting\Installation\InstallationBuilder;
@@ -23,13 +26,17 @@ use Contao\E2eTesting\Installation\InstallationWorkspace;
 use Contao\E2eTesting\Installation\PreparedInstallation;
 use Contao\E2eTesting\Process\ContaoConsole;
 use Contao\E2eTesting\Process\ProcessRunner;
+use Contao\InstallationRecipe\Fixture\FixtureLoader;
+use Contao\InstallationRecipe\Fixture\FixtureParser;
+use Contao\InstallationRecipe\Fixture\FixtureValueResolver;
+use Symfony\Component\Filesystem\Path;
 
 final readonly class ManagedEditionFactory
 {
     public function __construct(
-        private ManagedEditionRuntime $runtime = new ManagedEditionRuntime(),
-        private FingerprintCalculator $fingerprintCalculator = new FingerprintCalculator(),
-        private InstallationPool $installationPool = new InstallationPool(),
+        private ManagedEditionRuntime $runtime,
+        private FingerprintCalculator $fingerprintCalculator,
+        private InstallationPool $installationPool,
     ) {
     }
 
@@ -46,7 +53,7 @@ final readonly class ManagedEditionFactory
 
         $lease = $this->installationPool->acquire($cache, $dependencyFingerprint);
         $databaseName = 'contao_e2e_'.substr($dependencyFingerprint, 0, 16).'_'.$lease->slot;
-        $database = new DatabaseManager($databaseServer, $databaseName);
+        $database = $this->createDatabase($databaseServer, $databaseName);
         $installation = new PreparedInstallation($lease, $database, $fingerprints);
         $processRunner = new ProcessRunner();
         $console = new ContaoConsole($processRunner, $config->appEnvironment);
@@ -68,6 +75,14 @@ final readonly class ManagedEditionFactory
         return new ManagedEdition(
             new ManagedEditionState($installation, $config, $console),
             new ServerManager(appEnvironment: $config->appEnvironment),
+            new BrowserRuntime(Path::join($cache->rootDirectory, 'traces'), new PlaywrightManager()),
         );
+    }
+
+    private function createDatabase(DatabaseServerConfig $server, string $name): DatabaseManager
+    {
+        $fixtures = new FixtureLoader(new FixtureParser(), new FixtureValueResolver());
+
+        return new DatabaseManager($server, $name, $fixtures);
     }
 }

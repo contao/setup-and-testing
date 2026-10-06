@@ -20,8 +20,7 @@ use Contao\InstallationRecipe\File\PortableFilePolicy;
 use Contao\InstallationRecipe\Fixture\FixtureSet;
 use Contao\InstallationRecipe\Installation\InstallationRuntimeInterface;
 use Contao\InstallationRecipe\Installation\InstallationTarget;
-use Contao\InstallationRecipe\Installation\RecipeInstallationPlanner;
-use Contao\InstallationRecipe\Installation\RecipeInstaller;
+use Contao\InstallationRecipe\Installation\RecipeInstallerFactory;
 use Contao\InstallationRecipe\Recipe\PortableInstallationRecipe;
 use Contao\InstallationRecipe\Recipe\RecipeAssets;
 use Contao\InstallationRecipe\Recipe\RecipeContent;
@@ -54,7 +53,7 @@ final class RecipeInstallationPlanTest extends TestCase
     #[DataProvider('changedFiles')]
     public function testRejectsChangesAfterPlanning(string $path, string $contents): void
     {
-        $installer = new RecipeInstaller();
+        $installer = (new RecipeInstallerFactory())->create();
         $target = $this->target();
         $plan = $installer->plan($this->recipe(), $target);
         (new Filesystem())->dumpFile($this->directory.'/'.$path, $contents);
@@ -79,7 +78,7 @@ final class RecipeInstallationPlanTest extends TestCase
 
     public function testPlanExposesChangesWithoutWriting(): void
     {
-        $plan = (new RecipeInstaller())->plan($this->recipe(), $this->target());
+        $plan = (new RecipeInstallerFactory())->create()->plan($this->recipe(), $this->target());
         $this->assertSame('^1.0', $plan->changes['composer']['require']['acme/theme']);
         $this->assertStringContainsString('default_locale: en', $plan->changes['configuration']['fragments'][0]);
         $this->assertStringContainsString('title: Example', $plan->changes['fixtures'][0]);
@@ -91,7 +90,7 @@ final class RecipeInstallationPlanTest extends TestCase
 
     public function testRejectsAnotherTarget(): void
     {
-        $installer = new RecipeInstaller();
+        $installer = (new RecipeInstallerFactory())->create();
         $plan = $installer->plan($this->recipe(), $this->target());
         (new Filesystem())->mkdir($this->directory.'/another');
         (new Filesystem())->dumpFile($this->directory.'/another/composer.json', '{}');
@@ -114,7 +113,7 @@ final class RecipeInstallationPlanTest extends TestCase
 
         $this->expectException(InvalidRecipeException::class);
         $this->expectExceptionMessage('outside');
-        (new RecipeInstaller())->plan($this->recipe(), $this->target());
+        (new RecipeInstallerFactory())->create()->plan($this->recipe(), $this->target());
     }
 
     public static function documentLinks(): iterable
@@ -139,7 +138,7 @@ final class RecipeInstallationPlanTest extends TestCase
                 [new FileMapping($this->directory.'/recipe/style.css', 'files/theme/style.css', true)],
             )),
         );
-        $installer = new RecipeInstaller(planner: new RecipeInstallationPlanner(files: (new PortableFilePolicy())->withOverwrite(true)));
+        $installer = (new RecipeInstallerFactory())->create((new PortableFilePolicy())->withOverwrite(true));
         $target = $this->target();
         $plan = $installer->plan($recipe, $target);
         $this->assertTrue($plan->changes['files'][0]['overwrite']);
@@ -161,7 +160,7 @@ final class RecipeInstallationPlanTest extends TestCase
         unlink($this->directory.'/recipe/config.yaml');
 
         try {
-            (new RecipeInstaller())->plan($recipe, $this->target());
+            (new RecipeInstallerFactory())->create()->plan($recipe, $this->target());
             $this->fail('Missing configuration fragments must be rejected.');
         } catch (InvalidRecipeException $exception) {
             $this->assertStringContainsString('fragment must exist', $exception->getMessage());
@@ -180,7 +179,7 @@ final class RecipeInstallationPlanTest extends TestCase
                 new FileMapping($this->directory.'/recipe/dca.php', 'contao/dca/tl_content.php'),
             ])),
         );
-        $plan = (new RecipeInstaller())->plan($recipe, $this->target());
+        $plan = (new RecipeInstallerFactory())->create()->plan($recipe, $this->target());
         $this->assertSame('contao/dca/tl_content.php', $plan->changes['files'][0]['target']);
         $this->assertSame(['encoding' => 'utf-8', 'value' => $contents], $plan->changes['files'][0]['contents']);
         $this->assertFileDoesNotExist($this->directory.'/project/contao/dca/tl_content.php');
@@ -197,7 +196,7 @@ final class RecipeInstallationPlanTest extends TestCase
             $this->markTestSkipped('Symbolic links are unavailable on this platform.');
         }
 
-        $installer = new RecipeInstaller();
+        $installer = (new RecipeInstallerFactory())->create();
         $target = $this->target();
         $plan = $installer->plan($this->recipe(), $target);
         $this->assertSame('first/theme/style.css', $plan->changes['files'][0]['resolved-target']);
@@ -218,7 +217,7 @@ final class RecipeInstallationPlanTest extends TestCase
             $this->markTestSkipped('Symbolic links are unavailable on this platform.');
         }
 
-        $plan = (new RecipeInstaller())->plan($this->recipe(), $this->target());
+        $plan = (new RecipeInstallerFactory())->create()->plan($this->recipe(), $this->target());
         $this->assertSame(realpath($this->directory.'/project'), $plan->targetDirectory);
         $this->assertSame(realpath($this->directory.'/project/metadata/composer.json'), $plan->changes['composer']['destination']);
     }
@@ -236,7 +235,7 @@ final class RecipeInstallationPlanTest extends TestCase
 
         $this->expectException(InvalidRecipeException::class);
         $this->expectExceptionMessage('protected');
-        (new RecipeInstaller())->plan($this->recipe(), $this->target());
+        (new RecipeInstallerFactory())->create()->plan($this->recipe(), $this->target());
     }
 
     public function testDocumentLinksCannotBypassResolvedProtectedTargets(): void
@@ -251,7 +250,7 @@ final class RecipeInstallationPlanTest extends TestCase
 
         $this->expectException(InvalidRecipeException::class);
         $this->expectExceptionMessage('protected');
-        (new RecipeInstaller())->plan($this->recipe(), $this->target());
+        (new RecipeInstallerFactory())->create()->plan($this->recipe(), $this->target());
     }
 
     public function testSnapshotsTaggedConfigurationWithoutParsingWhenNoMergeIsRequested(): void
@@ -265,7 +264,7 @@ final class RecipeInstallationPlanTest extends TestCase
                 new FileMapping($this->directory.'/recipe/style.css', 'files/style.css'),
             ])),
         );
-        $installer = new RecipeInstaller();
+        $installer = (new RecipeInstallerFactory())->create();
         $target = $this->target();
         $plan = $installer->plan($recipe, $target);
         $this->assertSame($configuration, $plan->changes['configuration']['before']);
@@ -293,7 +292,7 @@ final class RecipeInstallationPlanTest extends TestCase
                 new FileMapping($this->directory.'/recipe/style.css', 'metadata/composer.json', true),
             ])),
         );
-        $installer = new RecipeInstaller(planner: new RecipeInstallationPlanner(files: (new PortableFilePolicy())->withOverwrite(true)));
+        $installer = (new RecipeInstallerFactory())->create((new PortableFilePolicy())->withOverwrite(true));
         $this->expectException(InvalidRecipeException::class);
         $this->expectExceptionMessage('protected');
         $installer->plan($recipe, $this->target());

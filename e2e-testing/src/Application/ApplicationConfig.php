@@ -12,6 +12,9 @@ declare(strict_types=1);
 
 namespace Contao\E2eTesting\Application;
 
+use Contao\E2eTesting\Browser\BrowserRuntime;
+use Contao\E2eTesting\Browser\PlaywrightManager;
+
 final class ApplicationConfig implements ApplicationConfigInterface
 {
     private function __construct(
@@ -33,7 +36,10 @@ final class ApplicationConfig implements ApplicationConfigInterface
 
     public function createApplication(): Application
     {
-        return new Application($this);
+        return new Application(
+            $this,
+            new BrowserRuntime($this->traceDirectory, new PlaywrightManager()),
+        );
     }
 
     public function traceDirectory(): string

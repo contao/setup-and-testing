@@ -18,7 +18,7 @@ use Symfony\Component\Filesystem\Path;
 
 final readonly class FingerprintCalculator
 {
-    public function __construct(private SourceFingerprintInterface $sourceFingerprint = new ProcessCachedSourceFingerprint())
+    public function __construct(private SourceFingerprintInterface $sourceFingerprint)
     {
     }
 

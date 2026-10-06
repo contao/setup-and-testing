@@ -18,8 +18,8 @@ use Doctrine\DBAL\Connection;
 final readonly class FixtureLoader
 {
     public function __construct(
-        private FixtureParser $parser = new FixtureParser(),
-        private FixtureValueResolver $valueResolver = new FixtureValueResolver(),
+        private FixtureParser $parser,
+        private FixtureValueResolver $valueResolver,
     ) {
     }
 
