@@ -24,6 +24,7 @@ extra_css:
     - assets/contao.css
 
 markdown_extensions:
+    - admonition
     - md_in_html
 
 plugins:

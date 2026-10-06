@@ -1,6 +1,8 @@
 # Installation recipes and end-to-end testing
 
-> **Development status:** These packages are still under very heavy development. There are no release tags yet, so require `dev-main` in Composer and expect breaking API changes. We plan a series of `0.x` releases while we work toward a stable API for Contao Core, extensions and regular web applications. [Feedback is always welcome](https://github.com/contao/setup-and-testing/issues).
+!!! warning "Under heavy development"
+
+    These packages are still under very heavy development. There are no release tags yet, so require `dev-main` in Composer and expect breaking API changes. We plan a series of `0.x` releases while we work toward a stable API for Contao Core, extensions and regular web applications. [Feedback is always welcome](https://github.com/contao/setup-and-testing/issues).
 
 Create and apply reusable installation recipes, or test applications with PHPUnit and a real browser. Choose the task that matches your project.
 
