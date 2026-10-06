@@ -37,7 +37,10 @@ final class ManagedEdition implements ApplicationInterface
 
     private string|null $preparedFixtureFingerprint = null;
 
-    private FixtureResult|null $preparedFixtureResult = null;
+    /**
+     * @var \WeakReference<FixtureResult>|null
+     */
+    private \WeakReference|null $preparedFixtureResult = null;
 
     public function __construct(
         private readonly ManagedEditionState $state,
@@ -86,15 +89,15 @@ final class ManagedEdition implements ApplicationInterface
     {
         $fingerprint = $this->fixtureFingerprint($fixtures);
 
-        if ($fingerprint === $this->preparedFixtureFingerprint && $this->preparedFixtureResult) {
+        if ($fingerprint === $this->preparedFixtureFingerprint && $this->hasPreparedFixtures()) {
             $this->resetRuntime();
 
-            return $this->preparedFixtureResult;
+            return $this->database()->fixtures();
         }
 
         $result = $this->resetDatabase($fixtures);
         $this->preparedFixtureFingerprint = $fingerprint;
-        $this->preparedFixtureResult = $result;
+        $this->preparedFixtureResult = \WeakReference::create($result);
 
         return $result;
     }
@@ -162,6 +165,11 @@ final class ManagedEdition implements ApplicationInterface
         $this->server = null;
         $this->database()->close();
         $this->state->installation->lease->release();
+    }
+
+    private function hasPreparedFixtures(): bool
+    {
+        return $this->database()->hasFixtures() && $this->preparedFixtureResult?->get() === $this->database()->fixtures();
     }
 
     private function clearMutableRuntime(): void

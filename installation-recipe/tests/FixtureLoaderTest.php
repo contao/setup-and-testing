@@ -18,6 +18,7 @@ use Contao\InstallationRecipe\Fixture\FixtureLoader;
 use Contao\InstallationRecipe\Fixture\FixtureParser;
 use Contao\InstallationRecipe\Fixture\FixtureSet;
 use Contao\InstallationRecipe\Fixture\FixtureValueResolver;
+use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\DriverManager;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Filesystem\Filesystem;
@@ -271,6 +272,95 @@ final class FixtureLoaderTest extends TestCase
         $loader->invalidateCache($connection);
 
         $this->assertSame('1', $loader->load($connection, $fixtures)->value('row', 'new_id'));
+    }
+
+    public function testCurrentResultsAreRetainedSeparatelyForEachConnection(): void
+    {
+        $loader = $this->fixtureLoader();
+        $first = $this->fixtureConnection();
+        $second = $this->fixtureConnection();
+        $second->insert('example', ['title' => 'Existing']);
+
+        $fixtures = new FixtureSet([$this->fixture("example:\n  article: {title: Article}\n")]);
+        $firstResult = $loader->load($first, $fixtures);
+        $secondResult = $loader->load($second, $fixtures);
+
+        $this->assertSame($firstResult, $loader->result($first));
+        $this->assertTrue($loader->hasResult($first));
+        $this->assertSame($secondResult, $loader->result($second));
+        $this->assertSame('1', $loader->result($first)->value('article'));
+        $this->assertSame('2', $loader->result($second)->value('article'));
+        $replacement = $loader->load($first, $fixtures);
+
+        $this->assertNotSame($firstResult, $replacement);
+        $this->assertSame($replacement, $loader->result($first));
+        $this->assertSame($secondResult, $loader->result($second));
+    }
+
+    public function testInvalidationDiscardsOnlyTheAffectedConnectionsResult(): void
+    {
+        $loader = $this->fixtureLoader();
+        $first = $this->fixtureConnection();
+        $second = $this->fixtureConnection();
+        $loader->load($first, FixtureSet::empty());
+        $secondResult = $loader->load($second, FixtureSet::empty());
+        $loader->invalidateCache($first);
+
+        $this->assertFalse($loader->hasResult($first));
+        $this->assertTrue($loader->hasResult($second));
+        $this->assertSame($secondResult, $loader->result($second));
+        $this->expectException(\LogicException::class);
+        $loader->result($first);
+    }
+
+    public function testFailedParsingDiscardsTheConnectionsPreviousResult(): void
+    {
+        $loader = $this->fixtureLoader();
+        $connection = $this->fixtureConnection();
+        $file = $this->fixture("example:\n  article: {title: Article}\n");
+        $loader->load($connection, new FixtureSet([$file]));
+        $duplicate = $this->fixture("example:\n  article: {title: Duplicate}\n");
+
+        try {
+            $loader->load($connection, new FixtureSet([$file, $duplicate]));
+            $this->fail('Expected duplicate fixture names to fail.');
+        } catch (InvalidRecipeException $exception) {
+            $this->assertStringContainsString('defined more than once', $exception->getMessage());
+        }
+
+        $this->expectException(\LogicException::class);
+        $loader->result($connection);
+    }
+
+    public function testRetainedResultsDoNotKeepConnectionsAlive(): void
+    {
+        $loader = $this->fixtureLoader();
+        $connection = $this->fixtureConnection();
+        $result = $loader->load($connection, FixtureSet::empty());
+        $connectionReference = \WeakReference::create($connection);
+        $resultReference = \WeakReference::create($result);
+        unset($connection, $result);
+        gc_collect_cycles();
+
+        $this->assertNull($connectionReference->get());
+        $this->assertNull($resultReference->get());
+    }
+
+    public function testUnloadedConnectionsHaveNoCurrentResult(): void
+    {
+        $loader = $this->fixtureLoader();
+        $connection = $this->fixtureConnection();
+        $this->assertFalse($loader->hasResult($connection));
+        $this->expectException(\LogicException::class);
+        $loader->result($connection);
+    }
+
+    private function fixtureConnection(): Connection
+    {
+        $connection = DriverManager::getConnection(['driver' => 'pdo_sqlite', 'memory' => true]);
+        $connection->executeStatement('CREATE TABLE example (id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT)');
+
+        return $connection;
     }
 
     private function fixture(string $contents): string

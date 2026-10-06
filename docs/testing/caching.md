@@ -35,7 +35,15 @@ This works with all application configurations, including Managed Edition and lo
 
 Managed Edition tests restore recipe fixtures between tests by default. Call `resetDatabase()` when you need a different fixture set or a fresh database during a test. It returns a `FixtureResult`, whose generated values can be read with `value()` or inserted into strings with `interpolate()`. See [fixture references](../recipes/fixtures.md).
 
-For read-only tests with a data provider, `prepareDatabase($fixtures)` reuses an unchanged fixture set. It still clears active browser sessions and mutable runtime caches. Use `resetDatabase()` if a test may have changed database contents.
+The fixture loader retains its current result per connection. The database manager exposes it through `self::managedEdition()->database()->fixtures()` after initial setup or any database reset. This accessor does not query the database or reload fixtures:
+
+```php
+$articleId = self::managedEdition()->database()->fixtures()->value('article');
+```
+
+Use the current result in helpers that only need fixture IDs. Runtime-only resets preserve the result. A failed database reset or schema recreation makes the result unavailable, and the accessor throws a `LogicException` until fixtures are loaded successfully again.
+
+For read-only tests with a data provider, `prepareDatabase($fixtures)` reuses an unchanged fixture set while its prepared result remains current. Direct database resets or result invalidation force the next call to reload the requested fixtures. It still clears active browser sessions and mutable runtime caches. Use `resetDatabase()` if a test may have changed database contents.
 
 Existing applications need their own database reset hooks. See [custom PHPUnit integration](phpunit.md).
 

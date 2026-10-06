@@ -37,15 +37,20 @@ Rows without names use the original list syntax and can still provide explicit I
 Given a DBAL `$connection` and a PHP `$recipe`, the low-level loader returns the values generated during import:
 
 ```php
+use Contao\InstallationRecipe\Cache\InMemoryCache;
 use Contao\InstallationRecipe\Fixture\FixtureLoader;
+use Contao\InstallationRecipe\Fixture\FixtureParser;
+use Contao\InstallationRecipe\Fixture\FixtureValueResolver;
 
-$result = (new FixtureLoader())->load($connection, $recipe->fixtures);
+$cache = new InMemoryCache();
+$loader = new FixtureLoader(new FixtureParser($cache), new FixtureValueResolver(), $cache);
+$result = $loader->load($connection, $recipe->fixtures);
 $pageId = $result->value('regular');
 $alias = $result->value('regular', 'alias');
 $url = $result->interpolate('/pages/{regular}/{regular->alias}');
 ```
 
-In a Managed Edition test, `resetDatabase()` also returns a `FixtureResult`. After applying an archive, read the result through `$result->fixtures`, as shown in [Apply a recipe](../guides/apply-recipe.md).
+After loading fixtures, `$loader->result($connection)` returns the current `FixtureResult` without querying the database or loading fixtures again. Results are retained separately for each live connection. A new load replaces that connection's result, and a failed load or explicit invalidation makes it unavailable until a successful load. In an e2e test, `self::managedEdition()->database()->fixtures()` delegates to this accessor and includes the initial fixture load. After applying an archive, read the result through `$result->fixtures`, as shown in [Apply a recipe](../guides/apply-recipe.md).
 
 ## Cache invalidation
 

@@ -41,6 +41,16 @@ final class DatabaseManager implements InstallationDatabaseInterface
         return $this->applicationUrl;
     }
 
+    public function fixtures(): FixtureResult
+    {
+        return $this->fixtureLoader->result($this->connection());
+    }
+
+    public function hasFixtures(): bool
+    {
+        return $this->fixtureLoader->hasResult($this->connection());
+    }
+
     public function connection(): Connection
     {
         return $this->connection ??= DriverManager::getConnection($this->connectionParameters($this->applicationUrl));
@@ -71,6 +81,7 @@ final class DatabaseManager implements InstallationDatabaseInterface
     public function reset(FixtureSet $fixtures): FixtureResult
     {
         $connection = $this->connection();
+        $this->fixtureLoader->clearResult($connection);
         $connection->executeStatement('SET FOREIGN_KEY_CHECKS = 0');
 
         try {

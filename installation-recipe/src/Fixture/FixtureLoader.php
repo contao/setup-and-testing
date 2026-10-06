@@ -18,23 +18,46 @@ use Doctrine\DBAL\Connection;
 
 final readonly class FixtureLoader
 {
+    /**
+     * @var \WeakMap<Connection, FixtureResult>
+     */
+    private \WeakMap $results;
+
     public function __construct(
         private FixtureParser $parser,
         private FixtureValueResolver $valueResolver,
         private InMemoryCache $cache,
     ) {
+        $this->results = new \WeakMap();
+    }
+
+    public function result(Connection $connection): FixtureResult
+    {
+        return $this->results[$connection] ?? throw new \LogicException('No fixtures have been loaded for the current database.');
+    }
+
+    public function hasResult(Connection $connection): bool
+    {
+        return isset($this->results[$connection]);
+    }
+
+    public function clearResult(Connection $connection): void
+    {
+        unset($this->results[$connection]);
     }
 
     public function invalidateCache(Connection $connection): void
     {
+        $this->clearResult($connection);
         $this->cache->scope($connection)->clear();
     }
 
     public function load(Connection $connection, FixtureSet $fixtures): FixtureResult
     {
+        $this->clearResult($connection);
         $definitions = $this->parser->parse($fixtures);
 
-        return $connection->transactional(fn () => $this->insertDefinitions($connection, $definitions));
+        return $this->results[$connection] = $connection->transactional(fn () => $this->insertDefinitions($connection, $definitions));
     }
 
     /**
