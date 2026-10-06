@@ -17,7 +17,7 @@ use Symfony\Component\Filesystem\Path;
 final readonly class ContaoConsole
 {
     public function __construct(
-        private ProcessRunner $processRunner,
+        private ProcessRunnerInterface $processRunner,
         private string $appEnvironment = 'prod',
     ) {
     }

@@ -22,7 +22,7 @@ use Doctrine\DBAL\Tools\DsnParser;
 /**
  * @phpstan-import-type Params from DriverManager
  */
-final class DatabaseManager
+final class DatabaseManager implements InstallationDatabaseInterface
 {
     private Connection|null $connection = null;
 

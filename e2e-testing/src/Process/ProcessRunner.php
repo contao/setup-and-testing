@@ -15,7 +15,7 @@ namespace Contao\E2eTesting\Process;
 use Contao\E2eTesting\Exception\ProcessFailedException;
 use Symfony\Component\Process\Process;
 
-final readonly class ProcessRunner
+final readonly class ProcessRunner implements ProcessRunnerInterface
 {
     /**
      * @param list<string>          $command

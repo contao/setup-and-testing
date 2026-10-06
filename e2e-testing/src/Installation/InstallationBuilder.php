@@ -13,6 +13,7 @@ declare(strict_types=1);
 namespace Contao\E2eTesting\Installation;
 
 use Contao\E2eTesting\Composer\ComposerInstaller;
+use Contao\E2eTesting\Database\InstallationDatabaseInterface;
 use Contao\E2eTesting\ManagedEdition\ManagedEditionConfig;
 use Contao\E2eTesting\Process\ContaoConsole;
 use Symfony\Component\Filesystem\Filesystem;
@@ -27,9 +28,9 @@ final readonly class InstallationBuilder
     ) {
     }
 
-    public function prepare(ManagedEditionConfig $config, PreparedInstallation $installation): void
+    public function prepare(ManagedEditionConfig $config, InstallationWorkspace $installation, InstallationDatabaseInterface $database): void
     {
-        $directory = $installation->directory();
+        $directory = $installation->directory;
         $manifestPath = Path::join($directory, '.contao-e2e-manifest.json');
         $manifest = InstallationManifest::read($manifestPath);
 
@@ -39,22 +40,24 @@ final readonly class InstallationBuilder
         }
 
         $applicationChanged = $manifest?->application !== $installation->fingerprints->application;
-        $installation->database->create();
+        $database->create();
 
         if ($applicationChanged) {
-            $this->prepareApplication($config, $installation, $manifest);
+            $this->applicationPreparer->prepare($config, $directory, $manifest);
+            $this->contaoConsole->setup($directory, $database->applicationUrl());
+            $this->writeApplicationManifest($config, $installation);
         }
 
-        if ($applicationChanged || !$installation->database->hasSchema()) {
-            $this->contaoConsole->migrate($directory, $installation->database->applicationUrl());
+        if ($applicationChanged || !$database->hasSchema()) {
+            $this->contaoConsole->migrate($directory, $database->applicationUrl());
         }
 
-        $installation->database->reset($config->recipe->fixtures);
+        $database->reset($config->recipe->fixtures);
     }
 
-    private function coldInstall(ManagedEditionConfig $config, PreparedInstallation $installation, string $manifestPath): void
+    private function coldInstall(ManagedEditionConfig $config, InstallationWorkspace $installation, string $manifestPath): void
     {
-        $directory = $installation->directory();
+        $directory = $installation->directory;
         $buildDirectory = $directory.'.building-'.bin2hex(random_bytes(6));
         $filesystem = new Filesystem();
         $filesystem->remove($buildDirectory);
@@ -73,16 +76,14 @@ final readonly class InstallationBuilder
         (new InstallationManifest($installation->fingerprints->dependency))->write($manifestPath);
     }
 
-    private function prepareApplication(ManagedEditionConfig $config, PreparedInstallation $installation, InstallationManifest|null $manifest): void
+    private function writeApplicationManifest(ManagedEditionConfig $config, InstallationWorkspace $installation): void
     {
-        $directory = $installation->directory();
-        $this->applicationPreparer->prepare($config, $directory, $manifest);
-        $this->contaoConsole->setup($directory, $installation->database->applicationUrl());
+        $directory = $installation->directory;
         $mappedTargets = array_map(static fn ($mapping) => $mapping->target, $config->recipe->assets->fileMappings);
-        new InstallationManifest(
+        (new InstallationManifest(
             $installation->fingerprints->dependency,
             $installation->fingerprints->application,
             $mappedTargets,
-        )->write(Path::join($directory, '.contao-e2e-manifest.json'));
+        ))->write(Path::join($directory, '.contao-e2e-manifest.json'));
     }
 }
