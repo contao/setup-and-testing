@@ -30,7 +30,12 @@ final class ManagedEditionPhpServerConfigTest extends TestCase
         $original = $this->config();
         $disabled = $original->withPhpServer($original->phpServer()->withOpcache(false));
 
-        $this->assertSame((new PhpServerConfig())->withOpcache()->arguments(), $original->phpServer()->arguments());
+        $this->assertContains('opcache.memory_consumption=128', $original->phpServer()->arguments());
+        $this->assertContains('opcache.max_accelerated_files=20000', $original->phpServer()->arguments());
+        $this->assertContains('opcache.interned_strings_buffer=32', $original->phpServer()->arguments());
+        $this->assertContains('realpath_cache_size="4096K"', $original->phpServer()->arguments());
+        $this->assertContains('realpath_cache_ttl=600', $original->phpServer()->arguments());
+        $this->assertContains('opcache.validate_timestamps=1', $original->phpServer()->arguments());
         $this->assertContains('opcache.enable=0', $disabled->phpServer()->arguments());
         $this->assertContains('opcache.enable_cli=0', $disabled->phpServer()->arguments());
         $this->assertContains('opcache.enable=1', $original->phpServer()->arguments());
@@ -39,6 +44,7 @@ final class ManagedEditionPhpServerConfigTest extends TestCase
     public function testPhpSettingsSurviveOtherConfigurationChanges(): void
     {
         $original = $this->config();
+        $originalArguments = $original->phpServer()->arguments();
         $php = (new PhpServerConfig())->withOpcache()->withIniSettings(['memory_limit' => '256M']);
         $configured = $original->withPhpServer($php);
         $dca = sys_get_temp_dir().'/php-settings-'.bin2hex(random_bytes(6)).'.php';
@@ -55,7 +61,7 @@ final class ManagedEditionPhpServerConfigTest extends TestCase
                 ->withSimulatedOrigins()
             ;
 
-            $this->assertSame((new PhpServerConfig())->withOpcache()->arguments(), $original->phpServer()->arguments());
+            $this->assertSame($originalArguments, $original->phpServer()->arguments());
             $this->assertNotSame($original, $configured);
             $this->assertSame($original->recipe, $configured->recipe);
             $this->assertSame($php, $changed->phpServer());

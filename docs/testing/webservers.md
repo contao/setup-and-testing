@@ -45,7 +45,19 @@ $php = (new PhpServerConfig())
 $config = LocalApplicationConfig::php($projectRoot)->withPhpServer($php);
 ```
 
-Managed Editions enable the OPcache preset by default. To customize their server settings while retaining that preset, derive the PHP configuration from the edition:
+Managed Editions enable the OPcache preset by default and apply the cache sizes recommended in [Contao's PHP setup guide](https://docs.contao.org/5.x/manual/en/performance/php-setup/):
+
+| Directive | Default |
+| --- | --- |
+| `opcache.memory_consumption` | `128` MB |
+| `opcache.max_accelerated_files` | `20000` |
+| `opcache.interned_strings_buffer` | `32` MB |
+| `realpath_cache_size` | `4096K` |
+| `realpath_cache_ttl` | `600` seconds |
+
+The production guide also recommends disabling OPcache timestamp validation. The testing defaults keep it enabled on every request because tests can change PHP files while the server is running. The server continues to use PHP's built-in SAPI rather than the production guide's PHP-FPM recommendation.
+
+To customize server settings while retaining these defaults, derive the PHP configuration from the edition:
 
 ```php
 $config = $config->withPhpServer(

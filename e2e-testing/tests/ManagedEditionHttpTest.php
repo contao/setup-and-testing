@@ -168,6 +168,13 @@ final class ManagedEditionHttpTest extends TestCase
             echo json_encode([
                 'pid' => getmypid(),
                 'opcache' => opcache_get_status(false),
+                'settings' => [
+                    'opcache.memory_consumption' => ini_get('opcache.memory_consumption'),
+                    'opcache.max_accelerated_files' => ini_get('opcache.max_accelerated_files'),
+                    'opcache.interned_strings_buffer' => ini_get('opcache.interned_strings_buffer'),
+                    'realpath_cache_size' => ini_get('realpath_cache_size'),
+                    'realpath_cache_ttl' => ini_get('realpath_cache_ttl'),
+                ],
             ]);
             PHP);
         touch($file, time() - 10);
@@ -176,6 +183,16 @@ final class ManagedEditionHttpTest extends TestCase
         $after = $this->application->send(HttpRequest::get('/'))->toArray();
 
         $this->assertTrue($before['opcache']['opcache_enabled']);
+        $this->assertSame(
+            [
+                'opcache.memory_consumption' => '128',
+                'opcache.max_accelerated_files' => '20000',
+                'opcache.interned_strings_buffer' => '32',
+                'realpath_cache_size' => '4096K',
+                'realpath_cache_ttl' => '600',
+            ],
+            $before['settings'],
+        );
         $this->assertSame($before['pid'], $after['pid']);
         $this->assertGreaterThan($before['opcache']['opcache_statistics']['hits'], $after['opcache']['opcache_statistics']['hits']);
     }

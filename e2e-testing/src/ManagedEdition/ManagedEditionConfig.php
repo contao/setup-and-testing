@@ -38,7 +38,13 @@ final class ManagedEditionConfig implements ApplicationConfigInterface
         public readonly DatabaseResetMode $resetMode = DatabaseResetMode::TRUNCATE,
         public readonly string $appEnvironment = 'prod',
     ) {
-        $this->phpServer = (new PhpServerConfig())->withOpcache();
+        $this->phpServer = (new PhpServerConfig())->withOpcache()->withIniSettings([
+            'opcache.memory_consumption' => 128,
+            'opcache.max_accelerated_files' => 20000,
+            'opcache.interned_strings_buffer' => 32,
+            'realpath_cache_size' => '4096K',
+            'realpath_cache_ttl' => 600,
+        ]);
     }
 
     public static function create(InstallationRecipe $recipe, string $projectDirectory): self
