@@ -18,6 +18,7 @@ use Contao\E2eTesting\Application\ApplicationRuntime;
 use Contao\E2eTesting\Application\LocalApplicationConfig;
 use Contao\E2eTesting\Cache\FingerprintSet;
 use Contao\E2eTesting\Database\DatabaseManager;
+use Contao\E2eTesting\Database\DatabaseResetter;
 use Contao\E2eTesting\Database\DatabaseServerConfig;
 use Contao\E2eTesting\Http\HttpBrowserOptions;
 use Contao\E2eTesting\Http\HttpRequest;
@@ -190,7 +191,7 @@ final class SimulatedOriginTest extends TestCase
         $lease = new InstallationLease($this->directory.'/installation', 0, null);
         $installation = new PreparedInstallation(
             $lease,
-            new DatabaseManager(new DatabaseServerConfig('mysql://localhost'), 'unused', $this->fixtureLoader()),
+            new DatabaseManager(new DatabaseServerConfig('mysql://localhost'), 'unused', $this->fixtureLoader(), new DatabaseResetter()),
             new FingerprintSet('origin', 'origin', 'origin'),
         );
         $config = ManagedEditionConfig::create(InstallationRecipe::create(ComposerConfig::managedEdition('^5.7')), $this->directory);

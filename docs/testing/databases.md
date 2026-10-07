@@ -1,6 +1,43 @@
 # Databases and test isolation
 
-This page applies to Managed Edition tests. Tests against an existing application use that project's own database setup and reset hooks.
+Managed Edition provisioning and resets support **MySQL and MariaDB**. For other applications, the reusable `DatabaseResetter` supports **MySQL, MariaDB, SQLite and PostgreSQL** on an existing Doctrine DBAL connection. Application configuration does not automatically reset an existing application's database.
+
+## Reset an existing application's database
+
+Call `DatabaseResetter` from your application's test setup or custom `ApplicationInterface::resetState()` implementation, then load your fixtures:
+
+```php
+use Contao\E2eTesting\Database\DatabaseResetter;
+use Doctrine\DBAL\DriverManager;
+
+$connection = DriverManager::getConnection([
+    'driver' => 'pdo_pgsql',
+    'host' => '127.0.0.1',
+    'dbname' => 'application_test',
+    'user' => 'test',
+    'password' => 'test',
+]);
+
+(new DatabaseResetter())->reset($connection);
+
+// Load the application's initial test data after the reset.
+```
+
+Supply a connection to a dedicated test database. The resetter removes data from every user table in the connected database, including tables outside the fixture set. It retains tables, indexes, constraints and views. PostgreSQL discovery includes user tables in other schemas in that database. Stop application writes before resetting, and use separate databases for parallel workers.
+
+| Database | Reset behavior |
+| --- | --- |
+| MySQL and MariaDB | Truncate tables containing rows or having advanced auto-increment counters, skipping clean tables |
+| PostgreSQL | Truncate all user tables in one statement with `RESTART IDENTITY`, resetting sequences owned by their columns |
+| SQLite | Delete table contents and reset their AUTOINCREMENT entries in `sqlite_sequence` within a transaction |
+
+The connection must have auto-commit enabled and no active transaction. This also applies to lazy connections that have not connected yet. A transaction in the test process cannot roll back writes committed by a separate application process. MySQL and MariaDB truncation commits implicitly and a failure may leave a partial reset. SQLite reset failures roll back the deletes and counter changes. PostgreSQL resets run as one atomic statement. Independently managed PostgreSQL sequences are outside the reset contract.
+
+MySQL, MariaDB and SQLite foreign-key settings are restored to their original values, including after a failure. PostgreSQL resets do not use `CASCADE` to pull additional tables into the reset. SQLite deletes execute delete triggers, while MySQL and MariaDB truncation does not. PostgreSQL executes truncate triggers.
+
+Install the PDO extension matching your connection: `pdo_mysql`, `pdo_pgsql` or `pdo_sqlite`. DBAL 3.6 and later in the 3.x series and DBAL 4.x are supported. CI runs the reset integration suite against MySQL 8.0 and 8.4, MariaDB 10.11 and 11.4, PostgreSQL 16 and 18, and SQLite 3 on both DBAL major versions. These reset capabilities do not extend Contao Managed Edition database support beyond MySQL and MariaDB.
+
+See [custom PHPUnit integration](phpunit.md#customize-application-setup-and-resets) to integrate the reset into your application lifecycle.
 
 ## Use Docker
 

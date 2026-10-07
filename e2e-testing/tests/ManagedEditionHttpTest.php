@@ -16,6 +16,7 @@ use Contao\E2eTesting\Application\ApplicationConfig;
 use Contao\E2eTesting\Application\ApplicationRuntime;
 use Contao\E2eTesting\Cache\FingerprintSet;
 use Contao\E2eTesting\Database\DatabaseManager;
+use Contao\E2eTesting\Database\DatabaseResetter;
 use Contao\E2eTesting\Database\DatabaseServerConfig;
 use Contao\E2eTesting\Http\HttpRequest;
 use Contao\E2eTesting\Http\ServerManager;
@@ -158,7 +159,7 @@ final class ManagedEditionHttpTest extends TestCase
     {
         $installation = new PreparedInstallation(
             new InstallationLease($this->directory.'/installation', 0, null),
-            new DatabaseManager(new DatabaseServerConfig('mysql://localhost'), 'unused', $this->fixtureLoader()),
+            new DatabaseManager(new DatabaseServerConfig('mysql://localhost'), 'unused', $this->fixtureLoader(), new DatabaseResetter()),
             new FingerprintSet('http-test', 'http-test', 'http-test'),
         );
         $recipe = InstallationRecipe::create(ComposerConfig::managedEdition('^5.7'));
