@@ -32,6 +32,7 @@ final class DatabaseManager implements InstallationDatabaseInterface
         private readonly DatabaseServerConfig $config,
         private readonly string $databaseName,
         private readonly FixtureLoader $fixtureLoader,
+        private readonly DatabaseResetter $resetter,
     ) {
         $this->applicationUrl = DatabaseUrl::parse($config->url)->withDatabase($databaseName);
     }
@@ -82,15 +83,7 @@ final class DatabaseManager implements InstallationDatabaseInterface
     {
         $connection = $this->connection();
         $this->fixtureLoader->clearResult($connection);
-        $connection->executeStatement('SET FOREIGN_KEY_CHECKS = 0');
-
-        try {
-            foreach ($connection->createSchemaManager()->listTableNames() as $table) {
-                $connection->executeStatement('TRUNCATE TABLE '.$connection->quoteSingleIdentifier($table));
-            }
-        } finally {
-            $connection->executeStatement('SET FOREIGN_KEY_CHECKS = 1');
-        }
+        $this->resetter->reset($connection);
 
         return $this->fixtureLoader->load($connection, $fixtures);
     }

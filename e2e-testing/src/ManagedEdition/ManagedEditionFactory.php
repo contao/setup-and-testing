@@ -16,6 +16,7 @@ use Contao\E2eTesting\Application\ApplicationRuntime;
 use Contao\E2eTesting\Cache\FingerprintCalculator;
 use Contao\E2eTesting\Composer\ComposerInstaller;
 use Contao\E2eTesting\Database\DatabaseManager;
+use Contao\E2eTesting\Database\DatabaseResetter;
 use Contao\E2eTesting\Database\DatabaseServerConfig;
 use Contao\E2eTesting\Http\ServerManager;
 use Contao\E2eTesting\Installation\ApplicationPreparer;
@@ -86,6 +87,6 @@ final readonly class ManagedEditionFactory
         $cache = $this->applicationRuntime->cache;
         $fixtures = new FixtureLoader(new FixtureParser($cache), new FixtureValueResolver(), $cache);
 
-        return new DatabaseManager($server, $name, $fixtures);
+        return new DatabaseManager($server, $name, $fixtures, new DatabaseResetter());
     }
 }

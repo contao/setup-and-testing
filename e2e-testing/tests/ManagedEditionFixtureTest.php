@@ -18,6 +18,7 @@ use Contao\E2eTesting\Browser\BrowserSession;
 use Contao\E2eTesting\Browser\BrowserSessionFactoryInterface;
 use Contao\E2eTesting\Cache\FingerprintSet;
 use Contao\E2eTesting\Database\DatabaseManager;
+use Contao\E2eTesting\Database\DatabaseResetter;
 use Contao\E2eTesting\Database\DatabaseServerConfig;
 use Contao\E2eTesting\Http\ServerManager;
 use Contao\E2eTesting\Installation\InstallationLease;
@@ -125,7 +126,7 @@ final class ManagedEditionFixtureTest extends TestCase
 
         $this->assertNotSame($initial, $current);
         $this->assertSame($current, $this->application->database()->fixtures());
-        $this->assertSame('2', $current->value('article'));
+        $this->assertSame('1', $current->value('article'));
     }
 
     public function testPreparedFixturesRemainCurrentDuringReuseAndRuntimeResets(): void
@@ -158,7 +159,7 @@ final class ManagedEditionFixtureTest extends TestCase
         $this->assertNotSame($initial, $prepared);
         $this->assertNotSame($direct, $prepared);
         $this->assertSame($prepared, $this->database->fixtures());
-        $this->assertSame('3', $prepared->value('article'));
+        $this->assertSame('1', $prepared->value('article'));
     }
 
     public function testDirectLoadingOfDifferentFixturesRestoresTheRequestedSet(): void
@@ -251,7 +252,7 @@ final class ManagedEditionFixtureTest extends TestCase
         $this->configureReset($connection, $sqlite);
         $cache = new InMemoryCache();
         $loader = new FixtureLoader(new FixtureParser($cache), new FixtureValueResolver(), $cache);
-        $database = new DatabaseManager(new DatabaseServerConfig('mysql://localhost'), 'unused', $loader);
+        $database = new DatabaseManager(new DatabaseServerConfig('mysql://localhost'), 'unused', $loader, new DatabaseResetter());
         (new \ReflectionProperty(DatabaseManager::class, 'connection'))->setValue($database, $connection);
 
         return $database;
@@ -260,6 +261,11 @@ final class ManagedEditionFixtureTest extends TestCase
     private function fixtureConnection(Connection $sqlite): Connection&Stub
     {
         $connection = $this->createStub(Connection::class);
+        $connection
+            ->method('isAutoCommit')
+            ->willReturnCallback($sqlite->isAutoCommit(...))
+        ;
+
         $connection
             ->method('getDatabasePlatform')
             ->willReturn($sqlite->getDatabasePlatform())
@@ -271,8 +277,8 @@ final class ManagedEditionFixtureTest extends TestCase
         ;
 
         $connection
-            ->method('quoteSingleIdentifier')
-            ->willReturnCallback($sqlite->quoteSingleIdentifier(...))
+            ->method('fetchOne')
+            ->willReturnCallback($sqlite->fetchOne(...))
         ;
 
         $connection
@@ -293,10 +299,10 @@ final class ManagedEditionFixtureTest extends TestCase
         $connection
             ->method('executeStatement')
             ->willReturnCallback(
-                function (string $sql) use ($sqlite): int {
+                function (string $sql, array $params = []) use ($sqlite): int|string {
                     ++$this->databaseOperations;
 
-                    return str_starts_with($sql, 'TRUNCATE TABLE ') ? $sqlite->executeStatement(str_replace('TRUNCATE TABLE ', 'DELETE FROM ', $sql)) : 0;
+                    return $sqlite->executeStatement($sql, $params);
                 },
             )
         ;

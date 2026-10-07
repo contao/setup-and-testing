@@ -18,7 +18,9 @@ The recipe package does not require Contao core, PHPUnit or browser tooling.
 - Playwright PHP 1.5 or newer within the package's Composer constraint.
 - Supported Symfony components from the 6.4, 7.x or 8.x lines, subject to their PHP requirements.
 
-Managed Edition tests also need Git, Docker with Linux containers or an administrative MySQL/MariaDB server, and Contao's required PHP extensions such as `intl`, `mbstring` and `pdo_mysql`. The recipe selects the Contao version. The testing package does not require a specific Contao bundle version.
+Generic database resets support MySQL, MariaDB, SQLite and PostgreSQL through Doctrine DBAL with the corresponding PHP database driver. See [database support and reset behavior](../testing/databases.md#reset-an-existing-applications-database).
+
+Managed Edition database provisioning supports MySQL and MariaDB only. Managed Edition tests also need Git, Docker with Linux containers or an administrative MySQL/MariaDB server, and Contao's required PHP extensions such as `intl`, `mbstring` and `pdo_mysql`. The recipe selects the Contao version. The testing package does not require a specific Contao bundle version.
 
 Tests for your own application can start a local server or connect to an existing URL. Your project prepares application dependencies and database state. PHPUnit still runs in PHP when the application uses another language.
 

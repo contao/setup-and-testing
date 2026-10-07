@@ -73,6 +73,8 @@ The environment applies to setup, migrations and HTTP requests. Changing it refr
 
 URL-based, local-server and Managed Edition configurations implement `ApplicationConfigInterface`, which creates an `ApplicationInterface`. A custom configuration can implement this contract to provide application-state resets without changing the shared trait. `ApplicationInterface::resetState()` defines the reset between tests. URL-based and local-server applications close browser contexts, while Managed Editions also restore database fixtures, including when configured directly through `ApplicationTestTrait`.
 
+For SQL applications, call the reusable [database resetter](databases.md#reset-an-existing-applications-database) from your reset implementation and load the initial data afterward. It supports MySQL, MariaDB, SQLite and PostgreSQL independently of Managed Edition provisioning.
+
 The first test uses the freshly created application without calling `resetState()`. Your custom factory must therefore prepare the initial test data. Later tests call `resetState()` by default. Override `shouldResetApplication()` only when your test setup intentionally manages resets itself. In that case, manage browser cleanup as well as application state.
 
 ## Use the tooling outside PHPUnit

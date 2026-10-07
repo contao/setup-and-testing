@@ -139,6 +139,92 @@ jobs:
             - name: Run the tests
               run: composer test
 
+    database-reset:
+        name: Database reset (${{ matrix.database }}, DBAL ${{ matrix.dbal }})
+        runs-on: ubuntu-latest
+        strategy:
+            fail-fast: false
+            matrix:
+                database: [mysql-8.0, mysql-8.4, mariadb-10.11, mariadb-11.4, postgres-16, postgres-18, sqlite]
+                dbal: ['3.6', '4.0']
+                include:
+                    - database: mysql-8.0
+                      image: mysql:8.0
+                      url: mysql://root:reset-password@127.0.0.1
+                      port: '3306'
+                      health: mysqladmin ping -h 127.0.0.1 -uroot -preset-password
+                    - database: mysql-8.4
+                      image: mysql:8.4
+                      url: mysql://root:reset-password@127.0.0.1
+                      port: '3306'
+                      health: mysqladmin ping -h 127.0.0.1 -uroot -preset-password
+                    - database: mariadb-10.11
+                      image: mariadb:10.11
+                      url: mysql://root:reset-password@127.0.0.1
+                      port: '3306'
+                      health: healthcheck.sh --connect --innodb_initialized
+                    - database: mariadb-11.4
+                      image: mariadb:11.4
+                      url: mysql://root:reset-password@127.0.0.1
+                      port: '3306'
+                      health: healthcheck.sh --connect --innodb_initialized
+                    - database: postgres-16
+                      image: postgres:16
+                      url: postgres://root:reset-password@127.0.0.1
+                      port: '5432'
+                      health: pg_isready -U root -d reset_test
+                    - database: postgres-18
+                      image: postgres:18
+                      url: postgres://root:reset-password@127.0.0.1
+                      port: '5432'
+                      health: pg_isready -U root -d reset_test
+                    - database: sqlite
+                      image: ''
+                      url: ''
+                      port: ''
+                      health: 'true'
+        services:
+            database:
+                image: ${{ matrix.image }}
+                env:
+                    MYSQL_ROOT_HOST: '%'
+                    MYSQL_ROOT_PASSWORD: reset-password
+                    MYSQL_DATABASE: reset_test
+                    MARIADB_ROOT_HOST: '%'
+                    MARIADB_ROOT_PASSWORD: reset-password
+                    MARIADB_DATABASE: reset_test
+                    POSTGRES_USER: root
+                    POSTGRES_PASSWORD: reset-password
+                    POSTGRES_DB: reset_test
+                ports:
+                    - 3306/tcp
+                    - 5432/tcp
+                options: >-
+                    --health-cmd="${{ matrix.health }}"
+                    --health-interval=5s --health-timeout=5s --health-retries=30
+        steps:
+            - name: Set up PHP
+              uses: shivammathur/setup-php@v2
+              with:
+                  php-version: '8.4'
+                  extensions: dom, intl, mbstring, pdo_mysql, pdo_pgsql, pdo_sqlite, zip
+                  coverage: none
+
+            - name: Checkout
+              uses: actions/checkout@v6
+              with:
+                  persist-credentials: false
+
+            - name: Select the DBAL version
+              run: |
+                  composer require 'doctrine/dbal:^${{ matrix.dbal }}' --no-update --no-interaction
+                  composer update doctrine/dbal --with-all-dependencies --no-interaction --no-progress
+
+            - name: Test database resets
+              env:
+                  CONTAO_E2E_RESET_DATABASE_URL: ${{ matrix.url && format('{0}:{1}/reset_test', matrix.url, job.services.database.ports[matrix.port]) || '' }}
+              run: vendor/bin/phpunit e2e-testing/tests/DatabaseResetterTest.php e2e-testing/tests/DatabaseResetterFailureTest.php
+
     yamllint:
         name: YAMLlint
         runs-on: ubuntu-latest

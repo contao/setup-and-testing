@@ -51,3 +51,14 @@ Every page belongs in the explicit navigation. Missing pages, missing anchors an
 Check examples against the current public APIs. Complete walkthroughs should specify their working directory, prerequisites, files, command and expected result. Explain existing-application state management separately from Managed Edition provisioning. Keep PHP code punctuation, but avoid semicolons in comments and prose.
 
 The Documentation workflow runs on every pull request and on pushes to `main`, including code-only changes. Existing repository CI also checks YAML formatting and Composer manifests. The built `site/` directory and `.venv-docs/` are ignored and stay out of package splits.
+
+## Verify database resets
+
+The default test suite runs the database reset integration tests against a temporary SQLite database. To verify a server-backed database locally, supply a dedicated, empty database that the test user may create and drop tables in:
+
+```shell
+CONTAO_E2E_RESET_DATABASE_URL='mysql://root:password@127.0.0.1:3306/reset_test' vendor/bin/phpunit e2e-testing/tests/DatabaseResetterTest.php
+CONTAO_E2E_RESET_DATABASE_URL='postgres://test:password@127.0.0.1:5432/reset_test' vendor/bin/phpunit e2e-testing/tests/DatabaseResetterTest.php
+```
+
+Use the MySQL URL form for MariaDB as well. A configured connection failure fails the suite. Engine-specific tests skip on other engines. CI supplies each documented database version and tests DBAL 3.x and 4.x separately.
