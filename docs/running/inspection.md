@@ -61,10 +61,28 @@ return static function (ApplicationRuntime $runtime): ManagedEdition {
 
 Preparation completes before the command announces that the edition is ready. The inspection session does not reset application state between your manual requests. If the callback uses Playwright, prepare its dependencies and browsers as you would for your tests.
 
+## Run in the background
+
+Use the same inspection file with `-d` or `--daemon`:
+
+```shell
+vendor/bin/contao-e2e server:start tests/inspection.php -d
+vendor/bin/contao-e2e server:status
+vendor/bin/contao-e2e server:stop
+```
+
+The start command returns after the worker starts. Preparation continues in the background. `server:status` reports `starting` until preparation finishes, then `running` with the frontend URL, backend URL and installation directory. The worker uses your project's Composer autoloader, working directory and environment.
+
+One background session can run per E2E workspace. A second start refuses while that session is active. Run status and stop from the same project root with the same `CONTAO_E2E_DIRECTORY` setting. Foreground sessions still stop through their own terminal.
+
+The log path is printed by start and status. Logs and session state live under `.contao-e2e/runtime/inspection`, or the corresponding custom workspace. If preparation fails, status reports `failed` and exits with code 1. A worker that exits unexpectedly leaves a `stale` session, also reported with code 1. You can start another session after the previous worker has exited. Starting again replaces the previous log. On Windows, standard error is written to `worker.log.error` alongside `worker.log`.
+
+Daemon mode works on Linux and macOS using `nohup`, and on Windows using PowerShell's `Start-Process`. `server:stop` requests cleanup and waits up to 30 seconds. With PCNTL in the worker and POSIX in the stop command, a stop request also interrupts preparation. Otherwise preparation must finish before the worker can handle the request. If shutdown is still pending, the command exits with code 1 and the request remains in place. Check status and retry stop later.
+
 ## Stop the session
 
 Press Enter to stop the HTTP server and release the installation. On systems with PHP's PCNTL extension, Ctrl+C and SIGTERM also shut down cleanly, including during recipe or scenario preparation. On Windows, use Enter once preparation finishes. Closing redirected input also ends an interactive session.
 
 Docker databases stop when the process exits and no other process holds a lease for that database. Shared databases remain running while another test or inspection process uses them. Cached installations and database storage remain available for subsequent runs.
 
-The command runs in the foreground. With `--no-interaction`, it ignores standard input and waits for a shutdown signal, which requires PCNTL. It does not provide daemon mode or a separate `server:stop` command.
+Without `-d`, the command runs in the foreground. With `--no-interaction`, it ignores standard input and waits for a shutdown signal, which requires PCNTL. Background workers accept `server:stop` without PCNTL. Stopping a background session that has already exited succeeds without affecting other processes.

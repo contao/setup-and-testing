@@ -14,6 +14,8 @@ namespace Contao\E2eTesting\Command;
 
 use Contao\E2eTesting\Application\ApplicationRuntime;
 use Contao\E2eTesting\Exception\InspectionInterruptedException;
+use Contao\E2eTesting\Inspection\InspectionDaemonManager;
+use Contao\E2eTesting\Inspection\InspectionSession;
 use Contao\E2eTesting\ManagedEdition\InspectionDefinitionLoader;
 use Contao\E2eTesting\ManagedEdition\ManagedEdition;
 use Contao\E2eTesting\ManagedEdition\ManagedEditionConfig;
@@ -21,6 +23,7 @@ use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\SignalableCommandInterface;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputInterface;
+use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Input\StreamableInputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Style\SymfonyStyle;
@@ -31,6 +34,11 @@ final class ServerStartCommand extends AbstractWorkspaceCommand implements Signa
     private bool $stopRequested = false;
 
     private bool $preparing = false;
+
+    public function __construct(private readonly InspectionSession|null $session = null)
+    {
+        parent::__construct();
+    }
 
     /**
      * @return list<int>
@@ -54,13 +62,31 @@ final class ServerStartCommand extends AbstractWorkspaceCommand implements Signa
     protected function configure(): void
     {
         $this->addArgument('inspection-file', InputArgument::REQUIRED, 'PHP file returning a ManagedEditionConfig or a factory callable');
+        $this->addOption('daemon', 'd', InputOption::VALUE_NONE, 'Prepare and run the inspection session in the background');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
+        if ($input->getOption('daemon')) {
+            $store = (new InspectionDaemonManager())->start((string) $input->getArgument('inspection-file'), $this->cache());
+            (new SymfonyStyle($input, $output))->success('Inspection worker started. Use server:status for readiness and URLs, and server:stop to shut down.');
+            $output->writeln('Log: '.$store->logFile());
+
+            return self::SUCCESS;
+        }
+
+        return $this->runInspection($input, $output);
+    }
+
+    private function runInspection(InputInterface $input, OutputInterface $output): int
+    {
         $this->stopRequested = false;
 
-        if (!$input->isInteractive() && !\function_exists('pcntl_signal')) {
+        if ($this->isStopRequested()) {
+            return self::SUCCESS;
+        }
+
+        if (!$this->session && !$input->isInteractive() && !\function_exists('pcntl_signal')) {
             throw new \InvalidArgumentException('Non-interactive inspection requires PCNTL for clean shutdown. Run interactively and press Enter instead.');
         }
 
@@ -77,6 +103,7 @@ final class ServerStartCommand extends AbstractWorkspaceCommand implements Signa
             }
 
             if (!$this->isStopRequested()) {
+                $this->session?->ready($edition);
                 $this->describeEdition($edition, new SymfonyStyle($input, $output), $input->isInteractive());
                 $this->waitForStop($input);
             }
@@ -130,7 +157,7 @@ final class ServerStartCommand extends AbstractWorkspaceCommand implements Signa
             ['Directory' => $edition->directory()],
             ['Database' => $edition->database()->applicationUrl()],
         );
-        $instructions = $interactive ? 'Press Enter to stop.' : 'Stop with Ctrl+C or SIGTERM.';
+        $instructions = $this->session ? 'Stop with server:stop.' : ($interactive ? 'Press Enter to stop.' : 'Stop with Ctrl+C or SIGTERM.');
 
         if ($interactive && \function_exists('pcntl_signal')) {
             $instructions .= ' Ctrl+C also shuts down cleanly.';
@@ -177,6 +204,6 @@ final class ServerStartCommand extends AbstractWorkspaceCommand implements Signa
 
     private function isStopRequested(): bool
     {
-        return $this->stopRequested;
+        return $this->stopRequested || ($this->session?->stopRequested() ?? false);
     }
 }
