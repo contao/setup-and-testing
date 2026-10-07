@@ -22,6 +22,7 @@ final readonly class ServerManager
         private Filesystem $filesystem = new Filesystem(),
         private FreePortFinder $portFinder = new FreePortFinder(),
         private string $appEnvironment = 'prod',
+        private PhpServerConfig $phpServer = new PhpServerConfig(),
     ) {
     }
 
@@ -34,6 +35,7 @@ final readonly class ServerManager
         $this->filesystem->dumpFile($routerFile, $this->router($directory));
 
         $config = WebServerConfig::php($directory, router: $routerFile)
+            ->withPhpServer($this->phpServer)
             ->withEnvironment([
                 'APP_ENV' => $this->appEnvironment,
                 'DATABASE_URL' => $databaseUrl,

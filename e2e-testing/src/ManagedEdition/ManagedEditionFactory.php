@@ -76,7 +76,7 @@ final readonly class ManagedEditionFactory
 
         return new ManagedEdition(
             new ManagedEditionState($installation, $config, $console),
-            new ServerManager(appEnvironment: $config->appEnvironment),
+            new ServerManager(appEnvironment: $config->appEnvironment, phpServer: $config->phpServer()),
             $this->applicationRuntime->createBrowserRuntime(Path::join($cache->rootDirectory, 'traces')),
             $this->applicationRuntime,
         );

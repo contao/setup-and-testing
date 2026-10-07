@@ -12,6 +12,7 @@ declare(strict_types=1);
 
 namespace Contao\E2eTesting\Application;
 
+use Contao\E2eTesting\Http\PhpServerConfig;
 use Contao\E2eTesting\Http\WebServerConfig;
 use Contao\E2eTesting\Http\WebServerManager;
 
@@ -43,6 +44,14 @@ final class LocalApplicationConfig implements ApplicationConfigInterface
     {
         $clone = clone $this;
         $clone->server = $this->server->withEnvironment($environment);
+
+        return $clone;
+    }
+
+    public function withPhpServer(PhpServerConfig $phpServer): self
+    {
+        $clone = clone $this;
+        $clone->server = $this->server->withPhpServer($phpServer);
 
         return $clone;
     }

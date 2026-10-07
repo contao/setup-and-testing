@@ -27,6 +27,45 @@ $config = LocalApplicationConfig::php($projectRoot, router: 'tests/router.php');
 
 Relative document roots and router paths are resolved against the project directory. A custom router follows PHP's built-in server contract, returning `false` when PHP should serve a file directly. The tooling does not modify your project or remove a supplied router.
 
+## Configure the spawned PHP process
+
+PHP servers start as separate processes. They read the usual PHP configuration files, but do not inherit the test process's `ini_set()` changes or PHP `-d` arguments. Use `PhpServerConfig` to pass settings directly to the spawned server:
+
+```php
+use Contao\E2eTesting\Http\PhpServerConfig;
+
+$php = (new PhpServerConfig())
+    ->withOpcache()
+    ->withIniSettings([
+        'memory_limit' => '256M',
+        'max_execution_time' => 60,
+        'display_errors' => false,
+    ]);
+
+$config = LocalApplicationConfig::php($projectRoot)->withPhpServer($php);
+```
+
+Managed Editions enable the OPcache preset by default. To customize their server settings while retaining that preset, derive the PHP configuration from the edition:
+
+```php
+$config = $config->withPhpServer(
+    $config->phpServer()->withIniSettings(['memory_limit' => '256M'])
+);
+
+// Disable OPcache for this edition.
+$config = $config->withPhpServer($config->phpServer()->withOpcache(false));
+```
+
+The configuration methods return clones. `withIniSettings()` merges directive values with existing settings, replacing only matching names. `withPhpServer()` replaces the complete PHP configuration. Values may be strings, integers or booleans. Settings are passed as PHP `-d` arguments before the server options, with strings quoted for PHP's INI parser. They apply to HTTP serving, while Composer, migrations and other console commands retain their own PHP settings. Local PHP servers add no tuning overrides by default.
+
+`withOpcache()` enables both `opcache.enable` and `opcache.enable_cli`. The OPcache extension must already be installed and loaded by the server's PHP binary. Without the extension, the server still runs, but does not benefit from caching. The preset enables timestamp validation on every request and disables inherited disk caching. Additional `withIniSettings()` calls can override these values. Use `withOpcache(false)` to disable OPcache explicitly.
+
+The server keeps its in-memory OPcache across requests and inter-test application resets. Releasing the application stops its server. Managed Editions each own a server process, so cached bytecode stays within that server's lifetime. On Windows, the launcher supplies a fresh `opcache.cache_id` for each PHP server, overriding any configured cache ID to prevent shared caches between editions. Persistent disk caching is outside this isolation guarantee if you explicitly enable it.
+
+Keep timestamp validation enabled when tests change or synchronize PHP files. Disabling `opcache.validate_timestamps` requires invalidation from the running server or a server restart for code changes to take effect. Resetting OPcache in PHPUnit's parent process does not clear the server's cache. See [PHP's OPcache configuration](https://www.php.net/manual/en/opcache.configuration.php).
+
+PHP settings apply to servers created with `php()`. For `command()` configurations, supply your runtime's options directly in the command arguments.
+
 ## Run another application's server command
 
 Provide an argument list and a working directory:

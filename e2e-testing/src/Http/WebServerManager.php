@@ -27,7 +27,9 @@ final readonly class WebServerManager
     public function start(WebServerConfig $config): WebServerProcess
     {
         $port = $this->portFinder->find();
-        $command = $config->commandForPort($port);
+        // Windows otherwise shares OPcache between PHP processes with the same cache ID.
+        $cacheId = 'Windows' === PHP_OS_FAMILY ? 'contao-e2e-'.bin2hex(random_bytes(16)) : null;
+        $command = $config->commandForPort($port, $cacheId);
         $router = $this->createRouter($config);
 
         if (null !== $router) {

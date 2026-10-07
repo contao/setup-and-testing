@@ -20,6 +20,8 @@ final class WebServerConfig
 
     private string|null $router = null;
 
+    private PhpServerConfig|null $phpServer = null;
+
     /**
      * @param list<string>                $command
      * @param array<string, string|false> $environment
@@ -95,12 +97,36 @@ final class WebServerConfig
         return $clone;
     }
 
+    public function withPhpServer(PhpServerConfig $phpServer): self
+    {
+        if (null === $this->documentRoot) {
+            throw new \InvalidArgumentException('PHP settings can only be configured on a PHP web server.');
+        }
+
+        $clone = clone $this;
+        $clone->phpServer = $phpServer;
+
+        return $clone;
+    }
+
     /**
      * @return list<string>
      */
-    public function commandForPort(int $port): array
+    public function commandForPort(int $port, string|null $opcacheCacheId = null): array
     {
-        return array_map(static fn (string $argument): string => str_replace('{port}', (string) $port, $argument), $this->command);
+        $command = array_map(static fn (string $argument): string => str_replace('{port}', (string) $port, $argument), $this->command);
+
+        if (null === $this->documentRoot) {
+            return $command;
+        }
+
+        $phpServer = $this->phpServer ?? new PhpServerConfig();
+
+        if (null !== $opcacheCacheId) {
+            $phpServer = $phpServer->withIniSettings(['opcache.cache_id' => $opcacheCacheId]);
+        }
+
+        return [$command[0], ...$phpServer->arguments(), ...\array_slice($command, 1)];
     }
 
     /**

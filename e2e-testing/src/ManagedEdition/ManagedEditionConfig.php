@@ -23,18 +23,22 @@ use Contao\E2eTesting\Database\DatabaseServerConfig;
 use Contao\E2eTesting\Database\DockerDatabaseConfig;
 use Contao\E2eTesting\Database\DockerDatabaseService;
 use Contao\E2eTesting\Docker\DockerServiceInterface;
+use Contao\E2eTesting\Http\PhpServerConfig;
 use Contao\E2eTesting\Installation\InstallationPool;
 use Contao\InstallationRecipe\File\FileMapping;
 use Contao\InstallationRecipe\Recipe\InstallationRecipe;
 
-final readonly class ManagedEditionConfig implements ApplicationConfigInterface
+final class ManagedEditionConfig implements ApplicationConfigInterface
 {
+    private PhpServerConfig $phpServer;
+
     private function __construct(
-        public InstallationRecipe $recipe,
-        public ManagedEditionEnvironment $environment,
-        public DatabaseResetMode $resetMode = DatabaseResetMode::TRUNCATE,
-        public string $appEnvironment = 'prod',
+        public readonly InstallationRecipe $recipe,
+        public readonly ManagedEditionEnvironment $environment,
+        public readonly DatabaseResetMode $resetMode = DatabaseResetMode::TRUNCATE,
+        public readonly string $appEnvironment = 'prod',
     ) {
+        $this->phpServer = (new PhpServerConfig())->withOpcache();
     }
 
     public static function create(InstallationRecipe $recipe, string $projectDirectory): self
@@ -57,9 +61,22 @@ final readonly class ManagedEditionConfig implements ApplicationConfigInterface
         return $factory->create($this)->startServer();
     }
 
+    public function phpServer(): PhpServerConfig
+    {
+        return $this->phpServer;
+    }
+
+    public function withPhpServer(PhpServerConfig $phpServer): self
+    {
+        $clone = clone $this;
+        $clone->phpServer = $phpServer;
+
+        return $clone;
+    }
+
     public function withEnvironment(ManagedEditionEnvironment $environment): self
     {
-        return new self($this->recipe, $environment, $this->resetMode, $this->appEnvironment);
+        return (new self($this->recipe, $environment, $this->resetMode, $this->appEnvironment))->withPhpServer($this->phpServer);
     }
 
     public function withDatabase(DatabaseServerConfig|DockerDatabaseConfig $database): self
@@ -90,7 +107,7 @@ final readonly class ManagedEditionConfig implements ApplicationConfigInterface
 
         $mapping = new FileMapping($path, 'contao/dca/'.basename($path));
 
-        return new self($this->recipe->withFileMapping($mapping), $this->environment, $this->resetMode, $this->appEnvironment);
+        return (new self($this->recipe->withFileMapping($mapping), $this->environment, $this->resetMode, $this->appEnvironment))->withPhpServer($this->phpServer);
     }
 
     public function withSimulatedOrigins(): self
@@ -103,16 +120,16 @@ final readonly class ManagedEditionConfig implements ApplicationConfigInterface
             }
         }
 
-        return new self($this->recipe->withConfigFile($path), $this->environment, $this->resetMode, $this->appEnvironment);
+        return (new self($this->recipe->withConfigFile($path), $this->environment, $this->resetMode, $this->appEnvironment))->withPhpServer($this->phpServer);
     }
 
     public function withResetMode(DatabaseResetMode $resetMode): self
     {
-        return new self($this->recipe, $this->environment, $resetMode, $this->appEnvironment);
+        return (new self($this->recipe, $this->environment, $resetMode, $this->appEnvironment))->withPhpServer($this->phpServer);
     }
 
     public function withAppEnvironment(string $appEnvironment): self
     {
-        return new self($this->recipe, $this->environment, $this->resetMode, $appEnvironment);
+        return (new self($this->recipe, $this->environment, $this->resetMode, $appEnvironment))->withPhpServer($this->phpServer);
     }
 }
