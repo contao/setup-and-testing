@@ -69,6 +69,8 @@ $prodConfig = $config->withAppEnvironment('prod');
 
 The environment applies to setup, migrations and HTTP requests. Changing it refreshes the cached application setup.
 
+Managed Editions enable OPcache for their HTTP server by default, with timestamp validation and a separate in-memory cache for each server. Use [`withPhpServer()`](webservers.md#configure-the-spawned-php-process) to disable OPcache or override PHP INI settings. These settings do not invalidate the prepared installation or change the PHP settings used for console commands.
+
 ## Customize application setup and resets
 
 URL-based, local-server and Managed Edition configurations implement `ApplicationConfigInterface`, which creates an `ApplicationInterface`. A custom configuration can implement this contract to provide application-state resets without changing the shared trait. `ApplicationInterface::resetState()` defines the reset between tests. URL-based and local-server applications close browser contexts, while Managed Editions also restore database fixtures, including when configured directly through `ApplicationTestTrait`.

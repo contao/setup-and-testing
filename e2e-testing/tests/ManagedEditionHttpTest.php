@@ -155,6 +155,48 @@ final class ManagedEditionHttpTest extends TestCase
         }
     }
 
+    public function testDefaultOpcacheSurvivesRuntimeResets(): void
+    {
+        if (!\extension_loaded('Zend OPcache')) {
+            $this->markTestSkipped('The OPcache extension must be installed to test its cache behavior.');
+        }
+
+        $file = $this->directory.'/installation/project/public/index.php';
+        (new Filesystem())->dumpFile($file, <<<'PHP'
+            <?php
+            header('Content-Type: application/json');
+            echo json_encode([
+                'pid' => getmypid(),
+                'opcache' => opcache_get_status(false),
+                'settings' => [
+                    'opcache.memory_consumption' => ini_get('opcache.memory_consumption'),
+                    'opcache.max_accelerated_files' => ini_get('opcache.max_accelerated_files'),
+                    'opcache.interned_strings_buffer' => ini_get('opcache.interned_strings_buffer'),
+                    'realpath_cache_size' => ini_get('realpath_cache_size'),
+                    'realpath_cache_ttl' => ini_get('realpath_cache_ttl'),
+                ],
+            ]);
+            PHP);
+        touch($file, time() - 10);
+        $before = $this->application->send(HttpRequest::get('/'))->toArray();
+        $this->application->resetRuntime();
+        $after = $this->application->send(HttpRequest::get('/'))->toArray();
+
+        $this->assertTrue($before['opcache']['opcache_enabled']);
+        $this->assertSame(
+            [
+                'opcache.memory_consumption' => '128',
+                'opcache.max_accelerated_files' => '20000',
+                'opcache.interned_strings_buffer' => '32',
+                'realpath_cache_size' => '4096K',
+                'realpath_cache_ttl' => '600',
+            ],
+            $before['settings'],
+        );
+        $this->assertSame($before['pid'], $after['pid']);
+        $this->assertGreaterThan($before['opcache']['opcache_statistics']['hits'], $after['opcache']['opcache_statistics']['hits']);
+    }
+
     private function application(): ManagedEdition
     {
         $installation = new PreparedInstallation(
@@ -163,16 +205,17 @@ final class ManagedEditionHttpTest extends TestCase
             new FingerprintSet('http-test', 'http-test', 'http-test'),
         );
         $recipe = InstallationRecipe::create(ComposerConfig::managedEdition('^5.7'));
+        $config = ManagedEditionConfig::create($recipe, $this->directory);
 
         $runtime = ApplicationRuntime::create();
 
         return new ManagedEdition(
             new ManagedEditionState(
                 $installation,
-                ManagedEditionConfig::create($recipe, $this->directory),
+                $config,
                 new ContaoConsole(new ProcessRunner()),
             ),
-            new ServerManager(),
+            new ServerManager(phpServer: $config->phpServer()),
             $runtime->createBrowserRuntime($this->directory.'/traces'),
             $runtime,
         );
