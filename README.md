@@ -24,11 +24,11 @@ Usage documentation is maintained only in the monorepo. The split packages conta
 | Setting | Purpose |
 | --- | --- |
 | `monorepo_url` | The Git remote for this source repository. |
-| `branch_filter` | The branches eligible for splitting: `main`, numeric release branches such as `1.0`, and `feature/*`. |
+| `branch_filter` | The branches eligible for splitting: `main` and numeric release branches such as `1.0`. Feature branches stay in the monorepo. |
 | `repositories` | Maps each package directory to its split repository: [`e2e-testing`](https://github.com/contao/e2e-testing) and [`installation-recipe`](https://github.com/contao/installation-recipe). |
 | `composer` | Extra settings for the combined root `composer.json`. Here, `bamarni/composer-bin-plugin` and Symfony HttpFoundation are root development dependencies. HttpFoundation verifies how Symfony interprets simulated origin headers in the test suite. The empty `require` and `conflict` lists add no constraints. |
 
-Work on both packages in this repository. The [split workflow](.github/workflows/split.yml) runs on pushes and passes the pushed branch or tag to `monorepo-tools`, which publishes each package directory to its configured repository. The package `composer.json` files remain alongside their source, while `monorepo-tools composer-json --validate` checks that the root Composer manifest represents both packages and the additions in `monorepo.yml`.
+Work on both packages in this repository. The [split workflow](.github/workflows/split.yml) runs on pushes to `main`, numeric release branches and tags, then passes the pushed branch or tag to `monorepo-tools`, which publishes each package directory to its configured repository. Feature branches are not published to the split repositories. The package `composer.json` files remain alongside their source, while `monorepo-tools composer-json --validate` checks that the root Composer manifest represents both packages and the additions in `monorepo.yml`.
 
 ## Development
 
