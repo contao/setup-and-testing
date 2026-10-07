@@ -65,6 +65,7 @@ nav:
           - Custom PHPUnit base classes: testing/phpunit.md
           - Caching and maintenance: testing/caching.md
     - Run and debug:
+          - Manual inspection: running/inspection.md
           - GitHub Actions and CI caches: running/ci.md
           - Windows setup: running/windows.md
           - Playwright options: running/playwright.md

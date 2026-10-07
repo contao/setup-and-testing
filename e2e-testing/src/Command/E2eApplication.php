@@ -25,6 +25,9 @@ final class E2eApplication extends Application
             new CacheClearCommand(),
             new CacheMetadataCommand(),
             new DatabaseStopCommand(),
+            new ServerStartCommand(),
+            new ServerStopCommand(),
+            new ServerStatusCommand(),
             new FailuresClearCommand(),
         ]);
         $this->setDefaultCommand('doctor');

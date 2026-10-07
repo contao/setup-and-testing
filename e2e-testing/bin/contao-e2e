@@ -15,4 +15,6 @@ if (!\is_string($autoload)) {
 
 require $autoload;
 
-exit(new E2eApplication()->run());
+$application = new E2eApplication();
+
+exit($application->run());
