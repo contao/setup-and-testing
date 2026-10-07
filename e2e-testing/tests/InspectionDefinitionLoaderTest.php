@@ -16,6 +16,7 @@ use Contao\E2eTesting\ManagedEdition\InspectionDefinitionLoader;
 use Contao\E2eTesting\ManagedEdition\ManagedEditionConfig;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Filesystem\Filesystem;
+use Symfony\Component\Filesystem\Path;
 
 final class InspectionDefinitionLoaderTest extends TestCase
 {
@@ -45,7 +46,9 @@ final class InspectionDefinitionLoaderTest extends TestCase
         $config = (new InspectionDefinitionLoader())->load($file);
 
         $this->assertInstanceOf(ManagedEditionConfig::class, $config);
-        $this->assertSame(realpath($this->directory), $config->environment->cache->projectDirectory);
+        $directory = realpath($this->directory);
+        $this->assertIsString($directory);
+        $this->assertSame(Path::canonicalize($directory), $config->environment->cache->projectDirectory);
     }
 
     public function testLoadsAFactoryWithoutExecutingIt(): void
