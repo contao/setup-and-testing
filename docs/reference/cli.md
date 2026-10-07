@@ -14,10 +14,13 @@ vendor/bin/contao-e2e help cache:metadata
 | `cache:clear` | Clear reusable E2E setup caches |
 | `failures:clear` | Clear retained failure artifacts |
 | `database:stop` | Stop all Docker database variants belonging to the project |
+| `server:start <inspection-file>` | Prepare a Managed Edition and keep it running for manual inspection |
 
 `cache:metadata` requires the Playwright Node dependencies to have been prepared with `vendor/bin/playwright-install`. It does not install dependencies or access the network itself. See [CI caching](../running/ci.md).
 
 `database:stop` refuses to interrupt active tests unless `--force` is supplied. Cleanup commands act on the project's E2E workspace. See [workspace layout](../testing/caching.md#workspace-and-cleanup).
+
+`server:start` loads a PHP file returning a Managed Edition configuration or a preparation factory. It prints the URLs and waits until you stop the session. See [manual inspection](../running/inspection.md) for configuration examples and shutdown behavior.
 
 Browser installation is supplied by the Playwright dependency:
 

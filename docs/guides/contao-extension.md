@@ -76,3 +76,5 @@ vendor/bin/phpunit --configuration=phpunit.xml.dist tests/E2e/ManagedEditionSmok
 PHPUnit reports a passing test after opening the backend login page. The first run installs Contao and may take longer than later cached runs. This test does not require an existing backend user. Replace its assertion with a check for your bundle's behavior once it passes.
 
 Add [recipe fixtures](../recipes/fixtures.md) for data-dependent tests, [test-specific DCA](../testing/dca.md) for widgets, or [frontend tests](../testing/frontend.md). Continue with [backend interactions](../testing/backend.md) and [CI setup](../running/ci.md).
+
+Use [manual inspection](../running/inspection.md) to keep the same Managed Edition running in your own browser with a selected fixture or scenario state.
