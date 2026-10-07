@@ -12,7 +12,7 @@ declare(strict_types=1);
 
 namespace Contao\E2eTesting\Tests;
 
-use Contao\E2eTesting\ManagedEdition\InspectionDefinitionLoader;
+use Contao\E2eTesting\Inspection\InspectionDefinitionLoader;
 use Contao\E2eTesting\ManagedEdition\ManagedEditionConfig;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Filesystem\Filesystem;

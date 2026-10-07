@@ -12,13 +12,14 @@ declare(strict_types=1);
 
 namespace Contao\E2eTesting\Command;
 
+use Contao\E2eTesting\Application\ApplicationConfigInterface;
+use Contao\E2eTesting\Application\ApplicationInterface;
 use Contao\E2eTesting\Application\ApplicationRuntime;
 use Contao\E2eTesting\Exception\InspectionInterruptedException;
 use Contao\E2eTesting\Inspection\InspectionDaemonManager;
+use Contao\E2eTesting\Inspection\InspectionDefinitionLoader;
+use Contao\E2eTesting\Inspection\InspectionDetails;
 use Contao\E2eTesting\Inspection\InspectionSession;
-use Contao\E2eTesting\ManagedEdition\InspectionDefinitionLoader;
-use Contao\E2eTesting\ManagedEdition\ManagedEdition;
-use Contao\E2eTesting\ManagedEdition\ManagedEditionConfig;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\SignalableCommandInterface;
 use Symfony\Component\Console\Input\InputArgument;
@@ -28,7 +29,7 @@ use Symfony\Component\Console\Input\StreamableInputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Style\SymfonyStyle;
 
-#[AsCommand('server:start', 'Prepare a Managed Edition and keep it running for manual inspection')]
+#[AsCommand('server:start', 'Prepare an application and keep it available for manual inspection')]
 final class ServerStartCommand extends AbstractWorkspaceCommand implements SignalableCommandInterface
 {
     private bool $stopRequested = false;
@@ -61,7 +62,7 @@ final class ServerStartCommand extends AbstractWorkspaceCommand implements Signa
 
     protected function configure(): void
     {
-        $this->addArgument('inspection-file', InputArgument::REQUIRED, 'PHP file returning a ManagedEditionConfig or a factory callable');
+        $this->addArgument('inspection-file', InputArgument::REQUIRED, 'PHP file returning an ApplicationConfigInterface or a factory callable');
         $this->addOption('daemon', 'd', InputOption::VALUE_NONE, 'Prepare and run the inspection session in the background');
     }
 
@@ -91,27 +92,27 @@ final class ServerStartCommand extends AbstractWorkspaceCommand implements Signa
         }
 
         $runtime = ApplicationRuntime::create();
-        $edition = null;
+        $application = null;
 
         try {
             $this->preparing = true;
 
             try {
-                $edition = $this->createEdition((string) $input->getArgument('inspection-file'), $runtime);
+                $application = $this->createApplication((string) $input->getArgument('inspection-file'), $runtime);
             } finally {
                 $this->preparing = false;
             }
 
             if (!$this->isStopRequested()) {
-                $this->session?->ready($edition);
-                $this->describeEdition($edition, new SymfonyStyle($input, $output), $input->isInteractive());
+                $this->session?->ready($application);
+                $this->describeApplication($application, new SymfonyStyle($input, $output), $input->isInteractive());
                 $this->waitForStop($input);
             }
         } catch (InspectionInterruptedException) {
             return self::SUCCESS;
         } finally {
             try {
-                $edition?->release();
+                $application?->release();
             } finally {
                 $runtime->close();
             }
@@ -120,43 +121,41 @@ final class ServerStartCommand extends AbstractWorkspaceCommand implements Signa
         return self::SUCCESS;
     }
 
-    private function createEdition(string $file, ApplicationRuntime $runtime): ManagedEdition
+    private function createApplication(string $file, ApplicationRuntime $runtime): ApplicationInterface
     {
         $definition = (new InspectionDefinitionLoader())->load($file);
-        $edition = $definition instanceof \Closure ? $definition($runtime) : $definition;
+        $application = $definition instanceof \Closure ? $definition($runtime) : $definition;
 
-        if ($edition instanceof ManagedEditionConfig) {
-            $edition = $runtime->createApplication($edition);
+        if ($application instanceof ApplicationConfigInterface) {
+            $application = $runtime->createApplication($application);
         }
 
-        if (!$edition instanceof ManagedEdition) {
-            throw new \InvalidArgumentException('The inspection factory must return a ManagedEditionConfig or a ManagedEdition.');
+        if (!$application instanceof ApplicationInterface) {
+            throw new \InvalidArgumentException('The inspection factory must return an ApplicationConfigInterface or an ApplicationInterface.');
         }
 
-        if ($edition->runtime() !== $runtime) {
-            $edition->release();
+        if ($application->runtime() !== $runtime) {
+            $application->release();
 
             throw new \InvalidArgumentException('The inspection factory must use the supplied ApplicationRuntime.');
         }
 
         try {
-            return $edition->startServer();
+            $application->uri();
+
+            return $application;
         } catch (\Throwable $exception) {
-            $edition->release();
+            $application->release();
 
             throw $exception;
         }
     }
 
-    private function describeEdition(ManagedEdition $edition, SymfonyStyle $io, bool $interactive): void
+    private function describeApplication(ApplicationInterface $application, SymfonyStyle $io, bool $interactive): void
     {
-        $io->title('Managed Edition ready for inspection');
-        $io->definitionList(
-            ['URL' => $edition->uri()],
-            ['Backend' => $edition->uri('/contao')],
-            ['Directory' => $edition->directory()],
-            ['Database' => $edition->database()->applicationUrl()],
-        );
+        $io->title('Application ready for inspection');
+        $io->definitionList(...InspectionDetails::forApplication($application)->rows());
+
         $instructions = $this->session ? 'Stop with server:stop.' : ($interactive ? 'Press Enter to stop.' : 'Stop with Ctrl+C or SIGTERM.');
 
         if ($interactive && \function_exists('pcntl_signal')) {

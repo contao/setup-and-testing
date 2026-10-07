@@ -14,7 +14,7 @@ vendor/bin/contao-e2e help cache:metadata
 | `cache:clear` | Clear reusable E2E setup caches |
 | `failures:clear` | Clear retained failure artifacts |
 | `database:stop` | Stop all Docker database variants belonging to the project |
-| `server:start <inspection-file> [-d]` | Prepare a Managed Edition for manual inspection, optionally in the background |
+| `server:start <inspection-file> [-d]` | Prepare an application for manual inspection, optionally in the background |
 | `server:status` | Show readiness and URLs for the background inspection session |
 | `server:stop` | Stop the background inspection session and release its leases |
 
@@ -22,7 +22,7 @@ vendor/bin/contao-e2e help cache:metadata
 
 `database:stop` refuses to interrupt active tests unless `--force` is supplied. Cleanup commands act on the project's E2E workspace. See [workspace layout](../testing/caching.md#workspace-and-cleanup).
 
-`server:start` loads a PHP file returning a Managed Edition configuration or a preparation factory. In foreground mode it prints the URLs and waits until you stop the session. With `-d`, preparation continues in a background worker and `server:status` shows readiness. See [manual inspection](../running/inspection.md) for configuration examples and shutdown behavior.
+`server:start` loads a PHP file returning an application configuration or a preparation factory. It supports Managed Editions, local servers, custom server commands and externally hosted applications. In foreground mode it prints the URLs and waits until you stop the session. With `-d`, preparation continues in a background worker and `server:status` shows readiness. See [manual inspection](../running/inspection.md) for configuration examples and shutdown behavior.
 
 Browser installation is supplied by the Playwright dependency:
 

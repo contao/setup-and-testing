@@ -10,11 +10,13 @@ declare(strict_types=1);
  * @license LGPL-3.0-or-later
  */
 
-namespace Contao\E2eTesting\ManagedEdition;
+namespace Contao\E2eTesting\Inspection;
+
+use Contao\E2eTesting\Application\ApplicationConfigInterface;
 
 final readonly class InspectionDefinitionLoader
 {
-    public function load(string $file): \Closure|ManagedEditionConfig
+    public function load(string $file): ApplicationConfigInterface|\Closure
     {
         $path = realpath($file);
 
@@ -24,7 +26,7 @@ final readonly class InspectionDefinitionLoader
 
         $definition = (static fn (string $path): mixed => require $path)($path);
 
-        if ($definition instanceof ManagedEditionConfig) {
+        if ($definition instanceof ApplicationConfigInterface) {
             return $definition;
         }
 
@@ -32,6 +34,6 @@ final readonly class InspectionDefinitionLoader
             return \Closure::fromCallable($definition);
         }
 
-        throw new \InvalidArgumentException('The inspection file must return a ManagedEditionConfig or a factory callable.');
+        throw new \InvalidArgumentException('The inspection file must return an ApplicationConfigInterface or a factory callable.');
     }
 }

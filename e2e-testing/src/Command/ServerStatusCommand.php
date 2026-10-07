@@ -12,6 +12,7 @@ declare(strict_types=1);
 
 namespace Contao\E2eTesting\Command;
 
+use Contao\E2eTesting\Inspection\InspectionDetails;
 use Contao\E2eTesting\Inspection\InspectionSessionStore;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Input\InputInterface;
@@ -36,7 +37,7 @@ final class ServerStatusCommand extends AbstractWorkspaceCommand
         $io->definitionList(['Status' => $phase], ['Active' => $active ? 'yes' : 'no'], ['Log' => $store->logFile()]);
 
         if ($active && 'running' === $phase) {
-            $io->definitionList(['URL' => $state['url']], ['Backend' => $state['backend']], ['Directory' => $state['directory']]);
+            $io->definitionList(...InspectionDetails::fromState($state)->rows());
         }
 
         return 'failed' === $phase || 'stale' === $phase ? self::FAILURE : self::SUCCESS;

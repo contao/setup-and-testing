@@ -12,7 +12,7 @@ declare(strict_types=1);
 
 namespace Contao\E2eTesting\Inspection;
 
-use Contao\E2eTesting\ManagedEdition\ManagedEdition;
+use Contao\E2eTesting\Application\ApplicationInterface;
 
 final class InspectionSession
 {
@@ -42,14 +42,13 @@ final class InspectionSession
         return new self($store, $token, $lock);
     }
 
-    public function ready(ManagedEdition $edition): void
+    public function ready(ApplicationInterface $application): void
     {
-        $this->store->write(array_replace($this->store->read(), [
-            'phase' => 'running',
-            'url' => $edition->uri(),
-            'backend' => $edition->uri('/contao'),
-            'directory' => $edition->directory(),
-        ]));
+        $this->store->write(array_replace(
+            $this->store->read(),
+            ['phase' => 'running'],
+            InspectionDetails::forApplication($application)->values,
+        ));
     }
 
     public function stopRequested(): bool

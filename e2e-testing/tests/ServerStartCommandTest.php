@@ -12,6 +12,8 @@ declare(strict_types=1);
 
 namespace Contao\E2eTesting\Tests;
 
+use Contao\E2eTesting\Application\ApplicationRuntime;
+use Contao\E2eTesting\Application\LocalApplicationConfig;
 use Contao\E2eTesting\Command\E2eApplication;
 use Contao\E2eTesting\Command\ServerStartCommand;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -59,7 +61,7 @@ final class ServerStartCommandTest extends TestCase
         $process->start();
 
         try {
-            $url = $this->waitForEdition($process);
+            $url = $this->waitForApplication($process);
             $this->assertSame('Prepared inspection state', HttpClient::create()->request('GET', $url)->getContent());
             $this->assertStringContainsString('mysql://localhost/inspection', $process->getOutput());
             $this->assertFalse(is_file($this->directory.'/database-stopped'));
@@ -73,6 +75,82 @@ final class ServerStartCommandTest extends TestCase
             $this->assertSessionReleased($url);
         } finally {
             $process->stop();
+        }
+    }
+
+    #[DataProvider('localModes')]
+    public function testInspectsLocalApplicationsAndStopsTheirServer(string $mode): void
+    {
+        $input = new InputStream();
+        $process = $this->process(__DIR__.'/Fixtures/inspection-local.php');
+        $process->setEnv(['CONTAO_INSPECTION_TEST_DIRECTORY' => $this->directory, 'CONTAO_INSPECTION_TEST_MODE' => $mode]);
+        $process->setInput($input);
+        $process->start();
+
+        try {
+            $url = $this->waitForApplication($process);
+            $expected = 'prepared' === $mode ? 'Prepared local inspection state' : 'Local inspection state';
+            $this->assertSame($expected, HttpClient::create()->request('GET', $url)->getContent());
+            $this->assertStringNotContainsString('Backend', $process->getOutput());
+            $this->assertStringNotContainsString('Database', $process->getOutput());
+            $input->write("\n");
+            $input->close();
+            $this->assertSame(0, $process->wait(), $process->getErrorOutput());
+            $this->assertServerStopped($url);
+        } finally {
+            $process->stop();
+        }
+    }
+
+    #[DataProvider('failureModes')]
+    public function testLocalPreparationFailuresStopTheServer(string $mode, string $message): void
+    {
+        $process = $this->process(__DIR__.'/Fixtures/inspection-local.php');
+        $process->setEnv(['CONTAO_INSPECTION_TEST_DIRECTORY' => $this->directory, 'CONTAO_INSPECTION_TEST_MODE' => $mode]);
+        $this->assertSame(1, $process->run(), $process->getOutput().$process->getErrorOutput());
+        $this->assertStringContainsString($message, $process->getOutput().$process->getErrorOutput());
+        $this->assertServerStopped(file_get_contents($this->directory.'/url'));
+    }
+
+    public static function failureModes(): iterable
+    {
+        yield 'factory throws' => ['failed', 'Local inspection preparation failed'];
+        yield 'foreign runtime' => ['foreign', 'must use the supplied ApplicationRuntime'];
+    }
+
+    public static function localModes(): iterable
+    {
+        yield 'PHP server' => ['php'];
+        yield 'custom command' => ['command'];
+        yield 'prepared application' => ['prepared'];
+        yield 'configuration factory' => ['factory'];
+    }
+
+    public function testInspectionDoesNotStopAnExternallyHostedApplication(): void
+    {
+        (new Filesystem())->dumpFile($this->directory.'/public/index.php', '<?php echo "External application";');
+        $runtime = ApplicationRuntime::create();
+        $external = $runtime->createApplication(LocalApplicationConfig::php($this->directory));
+        $process = $this->process(__DIR__.'/Fixtures/inspection-local.php');
+        $input = new InputStream();
+        $process->setInput($input);
+        $process->setEnv([
+            'CONTAO_INSPECTION_TEST_DIRECTORY' => $this->directory,
+            'CONTAO_INSPECTION_TEST_MODE' => 'external',
+            'CONTAO_INSPECTION_TEST_URL' => $external->uri(),
+        ]);
+        $process->start();
+
+        try {
+            $this->assertSame($external->uri(), $this->waitForApplication($process));
+            $input->write("\n");
+            $input->close();
+            $this->assertSame(0, $process->wait(), $process->getErrorOutput());
+            $this->assertSame('External application', HttpClient::create()->request('GET', $external->uri())->getContent());
+        } finally {
+            $process->stop();
+            $external->release();
+            $runtime->close();
         }
     }
 
@@ -94,7 +172,7 @@ final class ServerStartCommandTest extends TestCase
         $process->start();
 
         try {
-            $url = $this->waitForEdition($process);
+            $url = $this->waitForApplication($process);
             $process->signal('interrupt' === $signal ? SIGINT : SIGTERM);
             $this->assertSame(0, $process->wait(), $process->getErrorOutput());
             $this->assertSessionReleased($url);
@@ -189,10 +267,10 @@ final class ServerStartCommandTest extends TestCase
         return $process;
     }
 
-    private function waitForEdition(Process $process): string
+    private function waitForApplication(Process $process): string
     {
         $this->assertTrue($process->waitUntil(static fn (): bool => str_contains($process->getOutput(), 'Inspection session is running.')), $process->getErrorOutput());
-        $this->assertSame(1, preg_match('~http://localhost:\d+/~', $process->getOutput(), $matches));
+        $this->assertSame(1, preg_match('~http://(?:localhost|127\.0\.0\.1):\d+/~', $process->getOutput(), $matches));
 
         return $matches[0];
     }
@@ -219,7 +297,12 @@ final class ServerStartCommandTest extends TestCase
         }
 
         $this->assertSame('stopped', file_get_contents($this->directory.'/database-stopped'));
-        $socket = @stream_socket_client(str_replace('http://localhost:', 'tcp://127.0.0.1:', rtrim($url, '/')), $code, $message, 0.1);
+        $this->assertServerStopped($url);
+    }
+
+    private function assertServerStopped(string $url): void
+    {
+        $socket = @stream_socket_client('tcp://127.0.0.1:'.parse_url($url, PHP_URL_PORT), $code, $message, 0.1);
 
         if (false !== $socket) {
             fclose($socket);

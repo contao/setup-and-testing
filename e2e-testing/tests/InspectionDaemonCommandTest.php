@@ -12,9 +12,12 @@ declare(strict_types=1);
 
 namespace Contao\E2eTesting\Tests;
 
+use Contao\E2eTesting\Application\ApplicationRuntime;
+use Contao\E2eTesting\Application\LocalApplicationConfig;
 use Contao\E2eTesting\Command\E2eApplication;
 use Contao\E2eTesting\Database\DockerDatabaseLease;
 use Contao\E2eTesting\Inspection\InspectionSessionStore;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\HttpClient\HttpClient;
@@ -58,6 +61,8 @@ final class InspectionDaemonCommandTest extends TestCase
         $this->start();
         $state = $this->waitForPhase('running');
         $url = (string) $state['url'];
+        $this->assertSame(rtrim($url, '/').'/contao', $state['backend']);
+        $this->assertSame('mysql://localhost/inspection', $state['database']);
         $this->assertSame('Prepared inspection state', HttpClient::create()->request('GET', $url)->getContent());
         $this->assertFalse(is_file($this->directory.'/database-stopped'));
         $this->assertInstallationLock(false);
@@ -73,12 +78,80 @@ final class InspectionDaemonCommandTest extends TestCase
         $this->assertSame('stopped', $this->store()->read()['phase']);
         $this->assertInstallationLock(true);
         $this->assertSame('stopped', file_get_contents($this->directory.'/database-stopped'));
-        $socket = @stream_socket_client(str_replace('http://localhost:', 'tcp://127.0.0.1:', rtrim($url, '/')), $code, $message, 0.1);
-        if (false !== $socket) {
-            fclose($socket);
-        }
-        $this->assertFalse($socket);
+        $this->assertServerStopped($url);
         $this->assertSame(0, $this->command(['server:stop'])->run());
+    }
+
+    #[DataProvider('localModes')]
+    public function testBackgroundInspectionSupportsLocalApplications(string $mode): void
+    {
+        $this->start(__DIR__.'/Fixtures/inspection-local.php', ['CONTAO_INSPECTION_TEST_MODE' => $mode]);
+        $state = $this->waitForPhase('running');
+        $url = (string) $state['url'];
+        $expected = 'prepared' === $mode ? 'Prepared local inspection state' : 'Local inspection state';
+        $this->assertSame($expected, HttpClient::create()->request('GET', $url)->getContent());
+        $this->assertArrayNotHasKey('backend', $state);
+        $this->assertArrayNotHasKey('directory', $state);
+        $this->assertArrayNotHasKey('database', $state);
+        $status = $this->command(['server:status']);
+        $this->assertSame(0, $status->run());
+        $this->assertStringContainsString($url, $status->getOutput());
+        $this->assertStringNotContainsString('Backend', $status->getOutput());
+        $this->assertSame(0, $this->command(['server:stop'])->run());
+        $this->assertServerStopped($url);
+    }
+
+    #[DataProvider('failureModes')]
+    public function testLocalPreparationFailureReleasesTheBackgroundSession(string $mode, string $message): void
+    {
+        $this->command(['server:start', __DIR__.'/Fixtures/inspection-local.php', '-d'], ['CONTAO_INSPECTION_TEST_MODE' => $mode])->run();
+        $this->waitForPhase('failed');
+        $this->waitForExit();
+        $this->assertServerStopped(file_get_contents($this->directory.'/url'));
+        $log = file_get_contents($this->store()->logFile());
+
+        if (is_file($this->store()->logFile().'.error')) {
+            $log .= file_get_contents($this->store()->logFile().'.error');
+        }
+
+        $this->assertStringContainsString($message, $log);
+        $this->assertSame(1, $this->command(['server:status'])->run());
+        $this->start(__DIR__.'/Fixtures/inspection-local.php');
+        $this->waitForPhase('running');
+    }
+
+    public static function failureModes(): iterable
+    {
+        yield 'factory throws' => ['failed', 'Local inspection preparation failed'];
+        yield 'foreign runtime' => ['foreign', 'must use the supplied ApplicationRuntime'];
+    }
+
+    public static function localModes(): iterable
+    {
+        yield 'PHP server' => ['php'];
+        yield 'custom command' => ['command'];
+        yield 'prepared application' => ['prepared'];
+        yield 'configuration factory' => ['factory'];
+    }
+
+    public function testBackgroundInspectionDoesNotStopAnExternalServer(): void
+    {
+        (new Filesystem())->dumpFile($this->directory.'/public/index.php', '<?php echo "External application";');
+        $runtime = ApplicationRuntime::create();
+        $external = $runtime->createApplication(LocalApplicationConfig::php($this->directory));
+
+        try {
+            $this->start(__DIR__.'/Fixtures/inspection-local.php', [
+                'CONTAO_INSPECTION_TEST_MODE' => 'external',
+                'CONTAO_INSPECTION_TEST_URL' => $external->uri(),
+            ]);
+            $this->assertSame($external->uri(), $this->waitForPhase('running')['url']);
+            $this->assertSame(0, $this->command(['server:stop'])->run());
+            $this->assertSame('External application', HttpClient::create()->request('GET', $external->uri())->getContent());
+        } finally {
+            $external->release();
+            $runtime->close();
+        }
     }
 
     public function testStopPreservesADatabaseUsedByAnotherProcess(): void
@@ -226,25 +299,29 @@ final class InspectionDaemonCommandTest extends TestCase
         $this->assertFalse($store->stopRequested('stale'));
     }
 
-    private function start(string|null $file = null): void
+    /**
+     * @param array<string, string> $environment
+     */
+    private function start(string|null $file = null, array $environment = []): void
     {
-        $process = $this->command(['server:start', $file ?? __DIR__.'/Fixtures/inspection.php', '-d']);
+        $process = $this->command(['server:start', $file ?? __DIR__.'/Fixtures/inspection.php', '-d'], $environment);
         $this->assertSame(0, $process->run(), $process->getOutput().$process->getErrorOutput());
         $this->assertStringContainsString('Inspection worker started', $process->getOutput());
     }
 
     /**
-     * @param list<string> $arguments
+     * @param list<string>          $arguments
+     * @param array<string, string> $environment
      */
-    private function command(array $arguments): Process
+    private function command(array $arguments, array $environment = []): Process
     {
         return new Process(
             [PHP_BINARY, $this->directory.'/console.php', ...$arguments],
             $this->directory,
-            [
+            array_replace([
                 'CONTAO_INSPECTION_TEST_DIRECTORY' => $this->directory,
                 'CONTAO_E2E_DIRECTORY' => '.contao-e2e',
-            ],
+            ], $environment),
             timeout: 40,
         );
     }
@@ -280,6 +357,17 @@ final class InspectionDaemonCommandTest extends TestCase
             usleep(100_000);
         } while (microtime(true) < $deadline);
         $this->fail('Inspection worker did not reach the expected state. '.json_encode($this->store()->read()).' '.(is_file($this->store()->logFile()) ? file_get_contents($this->store()->logFile()) : ''));
+    }
+
+    private function assertServerStopped(string $url): void
+    {
+        $socket = @stream_socket_client('tcp://127.0.0.1:'.parse_url($url, PHP_URL_PORT), $code, $message, 0.1);
+
+        if (false !== $socket) {
+            fclose($socket);
+        }
+
+        $this->assertFalse($socket, 'The local inspection server must stop with the session.');
     }
 
     private function assertInstallationLock(bool $available): void
