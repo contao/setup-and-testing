@@ -19,6 +19,7 @@ use Contao\E2eTesting\Browser\PlaywrightClientFactoryInterface;
 use Contao\E2eTesting\Browser\PlaywrightManager;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
+use Playwright\Browser\BrowserBuilder;
 use Playwright\Configuration\PlaywrightConfig;
 use Playwright\Exception\DisconnectedException;
 use Playwright\PlaywrightClient;
@@ -283,7 +284,7 @@ final class PlaywrightManagerTest extends TestCase
 
         try {
             $options = BrowserOptions::create()->withAcceptLanguage('de-CH')->withViewport(1440, 1200)->withVideoSize(1440, 1200);
-            $manager->create(BrowserType::Firefox, 'https://example.test', $options)->close();
+            $manager->create(BrowserType::WebKit, 'https://example.test', $options)->close();
             $manager->create(BrowserType::Chromium, 'https://example.test', BrowserOptions::create())->close();
             $contexts = array_values(array_filter($this->messages, static fn (array $message): bool => 'newContext' === $message['action']));
             $launches = array_values(array_filter($this->messages, static fn (array $message): bool => 'launch' === $message['action']));
@@ -306,6 +307,49 @@ final class PlaywrightManagerTest extends TestCase
     {
         yield 'headed and slowed' => ['false', 250];
         yield 'headless without delay' => ['true', 0];
+    }
+
+    #[DataProvider('firefoxRecordingModes')]
+    public function testFirefoxRecordingPreferencesAreScopedToHeadedRecordings(bool $headless, bool $recording): void
+    {
+        putenv('PW_HEADLESS='.($headless ? 'true' : 'false'));
+
+        if ($recording) {
+            putenv('PW_VIDEOS_DIR=videos');
+        }
+
+        $requiresWorkaround = !$headless && $recording;
+        $manager = $this->manager();
+
+        try {
+            if ($requiresWorkaround && !(new \ReflectionClass(BrowserBuilder::class))->hasMethod('withFirefoxUserPrefs')) {
+                $this->expectException(\LogicException::class);
+                $this->expectExceptionMessage('Headed Firefox recordings require Playwright PHP with BrowserBuilder::withFirefoxUserPrefs() support.');
+            }
+
+            $manager->create(BrowserType::Firefox, 'https://example.test', BrowserOptions::create())->close();
+            $launches = array_values(array_filter($this->messages, static fn (array $message): bool => 'launch' === $message['action']));
+            $this->assertCount(1, $launches);
+
+            if ($requiresWorkaround) {
+                $this->assertSame(['layout.css.devPixelsPerPx' => '1.0'], $launches[0]['options']['firefoxUserPrefs']);
+            } else {
+                $this->assertArrayNotHasKey('firefoxUserPrefs', $launches[0]['options']);
+            }
+        } finally {
+            $manager->close();
+        }
+    }
+
+    /**
+     * @return iterable<string, array{bool, bool}>
+     */
+    public static function firefoxRecordingModes(): iterable
+    {
+        yield 'headed recording' => [false, true];
+        yield 'headless recording' => [true, true];
+        yield 'headed without recording' => [false, false];
+        yield 'headless without recording' => [true, false];
     }
 
     public function testInvalidRecordingDimensionsFailBeforeLaunchingBrowser(): void
@@ -355,6 +399,7 @@ final class PlaywrightManagerTest extends TestCase
 
         foreach ($launches as $launch) {
             $this->assertSame($headless, $launch['options']['headless']);
+            $this->assertArrayNotHasKey('firefoxUserPrefs', $launch['options']);
 
             if (0 === $slowMo) {
                 $this->assertArrayNotHasKey('slowMo', $launch['options']);

@@ -43,7 +43,7 @@ when this variable is unset or empty. These options are supported by `contao/e2e
 | `PW_VIDEOS_DIR` | Unset, recording disabled | Output directory, preferably an absolute path |
 | `PW_HEADLESS` | `true` | `false` opens a visible browser, independently of recording |
 | `PW_SLOWMO_MS` | `0` | Delay browser operations by this many milliseconds, independently of recording |
-| `PW_VIDEO_WIDTH`, `PW_VIDEO_HEIGHT` | Unset | Paired positive integer video dimensions in pixels, interpreted by Contao |
+| `PW_VIDEO_WIDTH`, `PW_VIDEO_HEIGHT` | Unset | Paired positive integer video dimensions in pixels, interpreted by `contao/e2e-testing` |
 | `BrowserOptions::withViewport($width, $height)` | Playwright's `1280 × 720` viewport | Positive integer page viewport dimensions |
 | `BrowserOptions::withVideoSize($width, $height)` | Effective initial viewport | Positive integer video dimensions, overriding the environment pair |
 
@@ -114,9 +114,21 @@ Chromium's browser window to `1000 × 700` left the emulated viewport at `1440 �
 content. Keep the native window large enough and avoid resizing it during a recording.
 
 Headed Firefox on this Retina display cropped the top-left portion even with matching dimensions. The issue also
-reproduced directly in Node Playwright, independently of PHP and Contao, with `deviceScaleFactor: 1`. A separate
-Node experiment setting Firefox's `layout.css.devPixelsPerPx` preference to `1.0` restored the complete frame.
-Playwright PHP 1.5.0 does not expose `firefoxUserPrefs` in its launch builder. Use Chromium or WebKit for headed
-recordings on affected displays, or headless Firefox. The dimensions API needs no upstream PHP changes. Exposing
-Firefox launch preferences upstream would make the verified workaround available without modifying vendor files.
-These observations are specific to the versions and platform tested, not a guarantee for other browser builds.
+reproduced directly in Node Playwright, independently of the PHP wrapper and `contao/e2e-testing`, with `deviceScaleFactor: 1`. Increasing
+`PW_VIDEO_WIDTH` is not a fix for this capture issue.
+
+For headed Firefox recordings on every platform, `contao/e2e-testing` automatically launches Firefox with
+`firefoxUserPrefs: {'layout.css.devPixelsPerPx': '1.0'}` through the wrapper's `BrowserBuilder::withFirefoxUserPrefs()`
+API. This sets Firefox's browser-level pixel density to one. The workaround is scoped to Firefox when recording is
+enabled and `PW_HEADLESS=false`. It does not affect headless runs, other browsers or runs without recording.
+The gate uses recording mode rather than operating system because high-DPI displays are not limited to macOS.
+Visual verification of the workaround was performed on macOS Retina, not Windows or Linux. A real recording through
+the PHP wrapper and `contao/e2e-testing` confirmed all four corners with this preference.
+Enlarging the Firefox viewport to `1600 × 1100` during this recording still clipped the right and bottom edges of
+the fixed `1440 × 1000` video, so keep the initial viewport unchanged throughout Firefox recordings.
+
+Playwright PHP 1.5.0 does not expose this API. With an older wrapper, affected runs throw `LogicException` with an
+explanation instead of silently recording cropped content. Use Chromium or WebKit for headed recordings, or headless
+Firefox, until the wrapper includes `withFirefoxUserPrefs()`. The wrapper change has been prepared separately and
+needs to be released upstream. These observations are specific to the versions and platform tested, not a guarantee
+for other browser builds.

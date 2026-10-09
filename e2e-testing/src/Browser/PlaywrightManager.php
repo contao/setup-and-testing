@@ -12,6 +12,7 @@ declare(strict_types=1);
 
 namespace Contao\E2eTesting\Browser;
 
+use Playwright\Browser\BrowserBuilder;
 use Playwright\Browser\BrowserContextInterface;
 use Playwright\Browser\BrowserInterface;
 use Playwright\Configuration\PlaywrightConfig;
@@ -176,7 +177,7 @@ final class PlaywrightManager implements BrowserSessionFactoryInterface
         try {
             return match ($type) {
                 BrowserType::Chromium => $playwright->chromium()->launch(),
-                BrowserType::Firefox => $playwright->firefox()->launch(),
+                BrowserType::Firefox => $this->launchFirefox($playwright),
                 BrowserType::WebKit => $playwright->webkit()->launch(),
             };
         } catch (PlaywrightExceptionInterface $exception) {
@@ -186,6 +187,30 @@ final class PlaywrightManager implements BrowserSessionFactoryInterface
 
             throw $exception;
         }
+    }
+
+    private function launchFirefox(PlaywrightClient $playwright): BrowserInterface
+    {
+        if ($this->config()->headless || null === $this->config()->videosDir) {
+            return $playwright->firefox()->launch();
+        }
+
+        $builder = $playwright->firefox();
+        $reflection = new \ReflectionObject($builder);
+
+        if (!$reflection->hasMethod('withFirefoxUserPrefs') || !$reflection->getMethod('withFirefoxUserPrefs')->isPublic()) {
+            throw new \LogicException('Headed Firefox recordings require Playwright PHP with BrowserBuilder::withFirefoxUserPrefs() support. Use Chromium or headless Firefox with older wrappers.');
+        }
+
+        // Firefox's native high-DPI recording can crop even when video and viewport
+        // dimensions match.
+        $builder = $reflection->getMethod('withFirefoxUserPrefs')->invoke($builder, ['layout.css.devPixelsPerPx' => '1.0']);
+
+        if (!$builder instanceof BrowserBuilder) {
+            throw new \LogicException('Configuring Firefox preferences must return a browser builder.');
+        }
+
+        return $builder->launch();
     }
 
     private function hasConnectedBrowser(): bool
