@@ -28,7 +28,8 @@ final class ContaoConsoleTest extends TestCase
             <?php
             echo json_encode([
                 'arguments' => array_slice($argv, 1),
-                'directory' => getcwd(),
+                // Windows may report the working directory using an 8.3 alias.
+                'directory' => realpath(getcwd()),
                 'environment' => getenv('APP_ENV'),
                 'database' => getenv('DATABASE_URL'),
                 'http_cache' => getenv('DISABLE_HTTP_CACHE'),

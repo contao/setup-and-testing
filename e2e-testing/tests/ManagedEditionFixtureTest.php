@@ -77,7 +77,8 @@ final class ManagedEditionFixtureTest extends TestCase
             <?php
             echo json_encode([
                 'arguments' => array_slice($argv, 1),
-                'directory' => getcwd(),
+                // Windows may report the working directory using an 8.3 alias.
+                'directory' => realpath(getcwd()),
                 'environment' => getenv('APP_ENV'),
                 'database' => getenv('DATABASE_URL'),
             ], JSON_THROW_ON_ERROR);
