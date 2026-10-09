@@ -31,6 +31,18 @@ final readonly class ContaoConsole
         );
     }
 
+    /**
+     * @param list<string> $arguments
+     */
+    public function run(string $directory, string $databaseUrl, array $arguments): string
+    {
+        return $this->processRunner->run(
+            [PHP_BINARY, Path::join($directory, 'vendor/bin/contao-console'), ...$arguments, '--no-interaction'],
+            $directory,
+            $this->environment($databaseUrl),
+        );
+    }
+
     public function migrate(string $directory, string $databaseUrl): void
     {
         $console = Path::join($directory, 'vendor/bin/contao-console');
@@ -51,11 +63,7 @@ final readonly class ContaoConsole
      */
     public function filesync(string $directory, string $databaseUrl, array $paths = []): void
     {
-        $this->processRunner->run(
-            [PHP_BINARY, Path::join($directory, 'vendor/bin/contao-console'), 'contao:filesync', ...$paths, '--no-interaction'],
-            $directory,
-            $this->environment($databaseUrl),
-        );
+        $this->run($directory, $databaseUrl, ['contao:filesync', ...$paths]);
     }
 
     /**

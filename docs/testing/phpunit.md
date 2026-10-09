@@ -35,6 +35,14 @@ For tests that start a local server, return a `LocalApplicationConfig` instead. 
 
 Use `ManagedEditionTestTrait` and return a `ManagedEditionConfig` from `createApplicationConfig()`. The trait adds `self::managedEdition()` for database, server and Contao operations. See [Databases](databases.md) for the complete trait example and optional Docker service provider.
 
+Run Contao console commands in the prepared installation with `runConsole()`:
+
+```php
+$output = self::managedEdition()->runConsole(['cache:clear']);
+```
+
+Pass the command and its arguments as a list of strings. The helper uses the configured application environment and installation database URL, adds `--no-interaction` and returns standard output. A failed command throws `Contao\E2eTesting\Exception\ProcessFailedException`.
+
 ## Enable simulated origins in a shared base class
 
 Enable the capability once in the managed configuration used by your shared base class. Individual tests can then choose different public origins for their HTTP requests and BrowserKit clients:
@@ -67,7 +75,7 @@ $devConfig = $config->withAppEnvironment('dev');
 $prodConfig = $config->withAppEnvironment('prod');
 ```
 
-The environment applies to setup, migrations and HTTP requests. Changing it refreshes the cached application setup.
+The environment applies to setup, migrations, console commands and HTTP requests. Changing it refreshes the cached application setup.
 
 Managed Editions enable OPcache for their HTTP server by default, with timestamp validation and a separate in-memory cache for each server. Use [`withPhpServer()`](webservers.md#configure-the-spawned-php-process) to disable OPcache or override PHP INI settings. These settings do not invalidate the prepared installation or change the PHP settings used for console commands.
 

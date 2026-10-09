@@ -121,6 +121,14 @@ final class ManagedEdition implements ApplicationInterface
         $this->state->console->filesync($this->directory(), $this->database()->applicationUrl(), $paths);
     }
 
+    /**
+     * @param list<string> $arguments
+     */
+    public function runConsole(array $arguments): string
+    {
+        return $this->state->console->run($this->directory(), $this->database()->applicationUrl(), $arguments);
+    }
+
     public function startServer(): self
     {
         if ($this->server) {

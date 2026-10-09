@@ -71,6 +71,31 @@ final class ManagedEditionFixtureTest extends TestCase
         (new Filesystem())->remove($this->directory);
     }
 
+    public function testConsoleRunsInTheInstallationWithItsDatabase(): void
+    {
+        (new Filesystem())->dumpFile($this->application->directory().'/vendor/bin/contao-console', <<<'PHP'
+            <?php
+            echo json_encode([
+                'arguments' => array_slice($argv, 1),
+                'directory' => getcwd(),
+                'environment' => getenv('APP_ENV'),
+                'database' => getenv('DATABASE_URL'),
+            ], JSON_THROW_ON_ERROR);
+            PHP);
+
+        $output = $this->application->runConsole(['app:example', '--option=value']);
+
+        $this->assertSame(
+            [
+                'arguments' => ['app:example', '--option=value', '--no-interaction'],
+                'directory' => realpath($this->application->directory()),
+                'environment' => 'prod',
+                'database' => $this->database->applicationUrl(),
+            ],
+            json_decode($output, true, flags: JSON_THROW_ON_ERROR),
+        );
+    }
+
     public function testReleaseClosesDatabaseAndLeaseWhenContextCleanupFails(): void
     {
         $lock = fopen($this->directory.'/lease.lock', 'c+');
