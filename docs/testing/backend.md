@@ -16,13 +16,49 @@ For an existing Contao project, wrap the generic browser explicitly. The helpers
 
 ```php
 use Contao\E2eTesting\Browser\BackendBrowser;
+use Contao\E2eTesting\Browser\BackendLoginSessionCache;
+use Contao\E2eTesting\Browser\Session\CookieSessionStorage;
+use Contao\E2eTesting\Browser\Session\SessionCache;
 
-$backend = new BackendBrowser(self::application()->createBrowser());
+$application = self::application();
+$sessions = new SessionCache($application->runtime()->cache, $application->uri(), new CookieSessionStorage());
+$backend = new BackendBrowser(
+    $application->createBrowser(),
+    new BackendLoginSessionCache($application->runtime()->cache, $sessions),
+);
 $backend->visit('/contao/login');
 $backend->submitLogin('admin', 'password');
 ```
 
 `createBackendBrowser()` is a Contao-specific convenience on Managed Editions. General applications provide `createBrowser()`.
+
+## Reuse authenticated sessions
+
+Use `loginOrReuseSessionAs()` when the login itself is not part of the behavior under test:
+
+```php
+$backend = self::managedEdition()
+    ->createBackendBrowser()
+    ->loginOrReuseSessionAs()
+;
+$backend->visit('/contao?do=article');
+```
+
+The username defaults to `k.jones` and the password to `kevinjones`. Pass another username and password as arguments:
+
+```php
+$backend->loginOrReuseSessionAs('content-editor', 'backend');
+```
+
+The first call submits the normal login form. Later calls restore the authenticated cookies and open `/contao`. If Contao rejects the session, the helper logs in again. An unsuccessful login throws a `RuntimeException`. The helper returns the same `BackendBrowser` for chaining and requires a user that can log in without two-factor authentication.
+
+The underlying [session services](browsers.md#cache-and-restore-sessions) can be used with any web application. Only the login form and authenticated-user verification are specific to Contao.
+
+Managed Editions configure PHP session-file storage, which caches a clean copy of the matching PHP session files under `var/sessions`. Each reuse restores that copy with a fresh session ID, so database resets and server restarts can keep the authentication without carrying subsequent session changes into the next test. Sessions are separated by installation, application environment, username, password and browser user agent. The cache lives in memory for the test process and can span test classes using the same installation. Session reuse has been verified with Contao 5.3, 5.7 and 6.0. Browser and Managed Edition integration checks are opt-in for local runs.
+
+For an existing Contao project, use the explicit browser and cache construction shown above, then call the same helper. Its cache is scoped to the application URL and restores cookies only. If your setup clears server-side sessions, or a Managed Edition uses a custom session handler outside `var/sessions`, the next call falls back to logging in. Each call replaces the cookies sent to the backend with those of the requested login. Cookies for other sites and paths are preserved.
+
+Continue using `visit('/contao/login')` and `submitLogin()` for tests that exercise authentication, logout, two-factor authentication or login side effects such as updating the last-login timestamp.
 
 ## Work with records and forms
 

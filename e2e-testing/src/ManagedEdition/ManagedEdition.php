@@ -16,10 +16,13 @@ use Contao\E2eTesting\Application\ApplicationInterface;
 use Contao\E2eTesting\Application\ApplicationRuntime;
 use Contao\E2eTesting\Application\HttpApplicationTrait;
 use Contao\E2eTesting\Browser\BackendBrowser;
+use Contao\E2eTesting\Browser\BackendLoginSessionCache;
 use Contao\E2eTesting\Browser\BrowserOptions;
 use Contao\E2eTesting\Browser\BrowserRuntime;
 use Contao\E2eTesting\Browser\BrowserSession;
 use Contao\E2eTesting\Browser\BrowserType;
+use Contao\E2eTesting\Browser\Session\PhpSessionStorage;
+use Contao\E2eTesting\Browser\Session\SessionCache;
 use Contao\E2eTesting\Database\DatabaseManager;
 use Contao\E2eTesting\Database\DatabaseResetMode;
 use Contao\E2eTesting\Http\ServerManager;
@@ -150,7 +153,14 @@ final class ManagedEdition implements ApplicationInterface
 
     public function createBackendBrowser(BrowserType $type = BrowserType::Firefox, BrowserOptions|null $options = null): BackendBrowser
     {
-        return new BackendBrowser($this->createBrowser($type, $options));
+        return new BackendBrowser($this->createBrowser($type, $options), new BackendLoginSessionCache(
+            $this->runtime->cache,
+            new SessionCache(
+                $this->runtime->cache,
+                $this->directory().'#'.$this->state->config->appEnvironment,
+                new PhpSessionStorage(Path::join($this->directory(), 'var/sessions')),
+            ),
+        ));
     }
 
     public function browserRuntime(): BrowserRuntime

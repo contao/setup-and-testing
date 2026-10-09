@@ -13,7 +13,11 @@ declare(strict_types=1);
 namespace Contao\E2eTesting\Tests;
 
 use Contao\E2eTesting\Browser\BackendBrowser;
+use Contao\E2eTesting\Browser\BackendLoginSessionCache;
 use Contao\E2eTesting\Browser\BrowserSession;
+use Contao\E2eTesting\Browser\Session\CookieSessionStorage;
+use Contao\E2eTesting\Browser\Session\SessionCache;
+use Contao\InstallationRecipe\Cache\InMemoryCache;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Playwright\Browser\BrowserContextInterface;
@@ -47,7 +51,11 @@ final class BackendBrowserTest extends TestCase
             ->with($predicate, $this->anything())
         ;
 
-        $browser = new BackendBrowser(new BrowserSession('http://localhost:8000', $this->createStub(BrowserContextInterface::class), $page));
+        $cache = new InMemoryCache();
+        $browser = new BackendBrowser(
+            new BrowserSession('http://localhost:8000', $this->createStub(BrowserContextInterface::class), $page),
+            new BackendLoginSessionCache($cache, new SessionCache($cache, 'http://localhost:8000', new CookieSessionStorage())),
+        );
         $actionRan = false;
         $browser->{$method}(
             static function () use (&$actionRan): void {

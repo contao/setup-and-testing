@@ -18,8 +18,10 @@ use Playwright\Page\PageInterface;
 
 final readonly class BackendBrowser
 {
-    public function __construct(private BrowserSession $browser)
-    {
+    public function __construct(
+        private BrowserSession $browser,
+        private BackendLoginSessionCache $loginSessions,
+    ) {
     }
 
     public function browser(): BrowserSession
@@ -47,6 +49,44 @@ final readonly class BackendBrowser
         $this->page()->locator('[name="username"]')->fill($username);
         $this->page()->locator('[name="password"]')->fill($password);
         $this->waitForNavigation(fn () => $this->page()->locator('button[name="login"]')->click());
+    }
+
+    public function loginOrReuseSessionAs(string $username = 'k.jones', string $password = 'kevinjones'): self
+    {
+        $userAgent = $this->page()->evaluate('() => navigator.userAgent');
+
+        if (!\is_string($userAgent)) {
+            throw new \RuntimeException('Could not determine the browser user agent.');
+        }
+
+        $key = $this->loginSessions->key($username, $password, $userAgent);
+        $session = $this->loginSessions->get($key);
+        $this->clearBackendCookies();
+
+        if ($session) {
+            $this->browser->context()->addCookies($this->loginSessions->restore($session));
+            $this->visit('/contao');
+
+            if ($session->userLabel === $this->authenticatedUserLabel()) {
+                return $this;
+            }
+
+            $this->loginSessions->forget($key);
+            $this->clearBackendCookies();
+        }
+
+        $this->visit('/contao/login');
+        $this->submitLogin($username, $password);
+
+        $userLabel = $this->authenticatedUserLabel();
+
+        if (null === $userLabel) {
+            throw new \RuntimeException(\sprintf('Could not log into the Contao backend as "%s".', $username));
+        }
+
+        $this->loginSessions->save($key, $this->browser->context()->cookies([$this->browser->uri('/contao')]), $userLabel);
+
+        return $this;
     }
 
     /**
@@ -195,6 +235,33 @@ final readonly class BackendBrowser
         $frame->locator($selector)->check();
         $this->page()->locator('.simple-modal .btn.primary')->click();
         $this->waitForFileSelection($field, $expectedValue);
+    }
+
+    private function clearBackendCookies(): void
+    {
+        $cookies = $this->browser->context()->cookies([
+            $this->browser->uri('/contao'),
+            $this->browser->uri('/contao/login'),
+        ]);
+
+        foreach ($cookies as &$cookie) {
+            $cookie['expires'] = 1;
+        }
+
+        if ([] !== $cookies) {
+            $this->browser->context()->addCookies($cookies);
+        }
+    }
+
+    private function authenticatedUserLabel(): string|null
+    {
+        $profile = $this->page()->locator('#tmenu .profile button, #profileButton');
+
+        if (0 === $profile->count() || 0 === $this->page()->locator('a[href*="/contao/logout"]')->count()) {
+            return null;
+        }
+
+        return $profile->first()->textContent();
     }
 
     private function fillField(string $field, string $value): void

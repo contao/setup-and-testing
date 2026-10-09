@@ -16,11 +16,14 @@ use Contao\E2eTesting\Application\Application;
 use Contao\E2eTesting\Application\ApplicationConfig;
 use Contao\E2eTesting\Application\ApplicationRuntime;
 use Contao\E2eTesting\Browser\BackendBrowser;
+use Contao\E2eTesting\Browser\BackendLoginSessionCache;
 use Contao\E2eTesting\Browser\BrowserOptions;
 use Contao\E2eTesting\Browser\BrowserRuntime;
 use Contao\E2eTesting\Browser\BrowserSession;
 use Contao\E2eTesting\Browser\BrowserSessionFactoryInterface;
 use Contao\E2eTesting\Browser\BrowserType;
+use Contao\E2eTesting\Browser\Session\CookieSessionStorage;
+use Contao\E2eTesting\Browser\Session\SessionCache;
 use Contao\E2eTesting\Http\WebServerConfig;
 use Contao\E2eTesting\Http\WebServerManager;
 use PHPUnit\Framework\TestCase;
@@ -80,7 +83,13 @@ class ApplicationTest extends TestCase
         ;
         $application = new Application(ApplicationConfig::create('http://localhost:8080'), new BrowserRuntime('/unused', $factory), ApplicationRuntime::shared());
 
-        $backend = new BackendBrowser($application->createBrowser(options: $options));
+        $backend = new BackendBrowser(
+            $application->createBrowser(options: $options),
+            new BackendLoginSessionCache(
+                $application->runtime()->cache,
+                new SessionCache($application->runtime()->cache, $application->uri(), new CookieSessionStorage()),
+            ),
+        );
         $this->assertSame($session, $backend->browser());
         $this->assertSame($page, $application->browserRuntime()->currentPage());
         $application->resetState();

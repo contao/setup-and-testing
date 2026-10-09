@@ -1,0 +1,12 @@
+tl_user:
+    kevin_jones:
+        tstamp: 1709063739
+        username: k.jones
+        name: Kevin Jones
+        email: k.jones@example.com
+        language: en
+        uploader: FileUpload
+        password: $2y$13$r2Bm9Yt7UdhbHJQ/HjgYZuUM89vVl9FSb0slHzlOfOY.ExQbj7u1.
+        admin: 1
+        disable: 0
+        dateAdded: 1257428510

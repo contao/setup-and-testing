@@ -21,6 +21,9 @@ use Contao\E2eTesting\Application\AbstractApplicationTestCase;
 use Contao\E2eTesting\Application\ApplicationConfig;
 use Contao\E2eTesting\Application\ApplicationConfigInterface;
 use Contao\E2eTesting\Browser\BackendBrowser;
+use Contao\E2eTesting\Browser\BackendLoginSessionCache;
+use Contao\E2eTesting\Browser\Session\CookieSessionStorage;
+use Contao\E2eTesting\Browser\Session\SessionCache;
 
 final class BackendLoginTest extends AbstractApplicationTestCase
 {
@@ -31,7 +34,12 @@ final class BackendLoginTest extends AbstractApplicationTestCase
 
     public function testBackendLoginPage(): void
     {
-        $backend = new BackendBrowser(self::application()->createBrowser());
+        $application = self::application();
+        $sessions = new SessionCache($application->runtime()->cache, $application->uri(), new CookieSessionStorage());
+        $backend = new BackendBrowser(
+            $application->createBrowser(),
+            new BackendLoginSessionCache($application->runtime()->cache, $sessions),
+        );
         $backend->visit('/contao/login');
 
         $this->assertSelectorExists('input[name="username"]');
@@ -61,7 +69,12 @@ PHPUnit should report passing frontend and backend tests. This backend check nee
 Create a backend test user through your project's fixtures or setup. Inside a test, log in before using the backend helpers:
 
 ```php
-$backend = new BackendBrowser(self::application()->createBrowser());
+$application = self::application();
+$sessions = new SessionCache($application->runtime()->cache, $application->uri(), new CookieSessionStorage());
+$backend = new BackendBrowser(
+    $application->createBrowser(),
+    new BackendLoginSessionCache($application->runtime()->cache, $sessions),
+);
 $backend->visit('/contao/login');
 $backend->submitLogin('admin', 'password');
 ```
