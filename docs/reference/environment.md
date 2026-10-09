@@ -15,6 +15,8 @@ Set environment variables before running PHPUnit or the CLI. See [Windows setup]
 | `PW_TIMEOUT_MS` | `30000` | Browser action, wait and navigation timeout in milliseconds |
 | `PW_HEADLESS` | `true` | Set to `false` to watch the browser |
 | `PW_SLOWMO_MS` | `0` | Delay browser operations by this many milliseconds |
+| `PW_VIDEOS_DIR` | Unset | Enable per-page WebM recordings in this directory, preferably an absolute path, see [recording](../running/playwright.md#record-videos) |
+| `PW_VIDEO_WIDTH`, `PW_VIDEO_HEIGHT` | Initial viewport | Paired positive integer video dimensions, overridden by `BrowserOptions::withVideoSize()` |
 | `PW_CHANNEL` | Unset | Select an installed browser channel such as `chrome` or `msedge` |
 
 `E2E_BASE_URL` is a convention used by these guides' test configuration, not an environment variable automatically consumed by the library. `DATABASE_URL` in the recipe installer example belongs to the host application's configuration.

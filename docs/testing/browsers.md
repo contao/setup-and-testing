@@ -41,7 +41,7 @@ See [Contao backend interactions](backend.md), [Playwright options](../running/p
 
 ## Configure browser options
 
-`BrowserOptions` configures accepted languages and viewport dimensions for `createBrowser()` and `createBackendBrowser()`:
+`BrowserOptions` configures accepted languages, viewport dimensions and video dimensions for `createBrowser()` and `createBackendBrowser()`:
 
 ```php
 $options = BrowserOptions::create()
@@ -52,6 +52,10 @@ $browser = self::managedEdition()->createBrowser(options: $options);
 ```
 
 Read configured values with `acceptLanguage()`, `viewportWidth()` and `viewportHeight()`. Every `with…()` method returns a clone.
+
+When `PW_VIDEOS_DIR` enables recording, videos match the initial viewport by default. Use `withVideoSize($width, $height)`
+to choose explicit recording dimensions, and read them with `videoWidth()` and `videoHeight()`. See [video recording](../running/playwright.md#record-videos)
+for environment options, precedence, sharing and browser limitations.
 
 For application-side origin simulation in BrowserKit, pass `HttpBrowserOptions::create()->withSimulatedOrigin('https://example.local')` to `createHttpBrowser()`. See [simulated public origins](frontend.md#simulate-a-public-origin) for setup. Playwright uses the configured application URL. To test a particular domain or HTTPS in a real browser, configure the test server and connect through `ApplicationConfig::create($url)`.
 

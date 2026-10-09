@@ -55,7 +55,8 @@ final class PlaywrightManager implements BrowserSessionFactoryInterface
         }
 
         $this->recycleIfIdle();
-        $context = $this->browser($type)->newContext($this->optionsNormalizer->normalize($options));
+        $contextOptions = $this->optionsNormalizer->normalize($options, $this->config());
+        $context = $this->browser($type)->newContext($contextOptions);
         ++$this->contextCount;
 
         try {

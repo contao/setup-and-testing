@@ -46,6 +46,31 @@ final class PlaywrightManagerTest extends TestCase
 
     private int $contextCount = 0;
 
+    /**
+     * @var list<array<string, mixed>>
+     */
+    private array $messages = [];
+
+    /**
+     * @var array<string, string|false>
+     */
+    private array $environment = [];
+
+    protected function setUp(): void
+    {
+        foreach (['PW_VIDEOS_DIR', 'PW_HEADLESS', 'PW_SLOWMO_MS', 'PW_VIDEO_WIDTH', 'PW_VIDEO_HEIGHT'] as $name) {
+            $this->environment[$name] = getenv($name);
+            putenv($name);
+        }
+    }
+
+    protected function tearDown(): void
+    {
+        foreach ($this->environment as $name => $value) {
+            putenv(false === $value ? $name : $name.'='.$value);
+        }
+    }
+
     public function testClosedManagersCannotLaunchNewBrowsers(): void
     {
         $manager = $this->manager();
@@ -247,6 +272,98 @@ final class PlaywrightManagerTest extends TestCase
         }
     }
 
+    #[DataProvider('recordingLaunchOptions')]
+    public function testPropagatesRecordingConfigurationAndPreservesLaunchEnvironment(string $headless, int $slowMo): void
+    {
+        foreach (['PW_VIDEOS_DIR' => 'videos', 'PW_HEADLESS' => $headless, 'PW_SLOWMO_MS' => (string) $slowMo, 'PW_VIDEO_WIDTH' => '1024', 'PW_VIDEO_HEIGHT' => '768'] as $name => $value) {
+            putenv($name.'='.$value);
+        }
+
+        $manager = $this->manager();
+
+        try {
+            $options = BrowserOptions::create()->withAcceptLanguage('de-CH')->withViewport(1440, 1200)->withVideoSize(1440, 1200);
+            $manager->create(BrowserType::Firefox, 'https://example.test', $options)->close();
+            $manager->create(BrowserType::Chromium, 'https://example.test', BrowserOptions::create())->close();
+            $contexts = array_values(array_filter($this->messages, static fn (array $message): bool => 'newContext' === $message['action']));
+            $launches = array_values(array_filter($this->messages, static fn (array $message): bool => 'launch' === $message['action']));
+
+            $this->assertSame(['dir' => 'videos', 'size' => ['width' => 1440, 'height' => 1200]], $contexts[0]['options']['recordVideo']);
+            $this->assertSame(['width' => 1440, 'height' => 1200], $contexts[0]['options']['viewport']);
+            $this->assertSame(['Accept-Language' => 'de-CH'], $contexts[0]['options']['extraHTTPHeaders']);
+            $this->assertSame(['dir' => 'videos', 'size' => ['width' => 1024, 'height' => 768]], $contexts[1]['options']['recordVideo']);
+
+            $this->assertLaunchOptions($launches, 'true' === $headless, $slowMo);
+        } finally {
+            $manager->close();
+        }
+    }
+
+    /**
+     * @return iterable<string, array{string, int}>
+     */
+    public static function recordingLaunchOptions(): iterable
+    {
+        yield 'headed and slowed' => ['false', 250];
+        yield 'headless without delay' => ['true', 0];
+    }
+
+    public function testInvalidRecordingDimensionsFailBeforeLaunchingBrowser(): void
+    {
+        putenv('PW_VIDEOS_DIR=videos');
+        putenv('PW_VIDEO_WIDTH=1280');
+        $manager = $this->manager();
+
+        try {
+            try {
+                $manager->create(BrowserType::Firefox, 'https://example.test', BrowserOptions::create());
+                $this->fail('Expected an incomplete video dimension pair to fail.');
+            } catch (\InvalidArgumentException $exception) {
+                $this->assertSame('PW_VIDEO_WIDTH and PW_VIDEO_HEIGHT must both be positive integers.', $exception->getMessage());
+            }
+
+            $this->assertSame(0, $this->clientCount);
+            $this->assertSame(0, $this->launchCount);
+            $this->assertSame(0, $this->contextCount);
+        } finally {
+            $manager->close();
+        }
+    }
+
+    public function testVideoDimensionsDoNotEnableRecordingWhenDirectoryIsEmpty(): void
+    {
+        putenv('PW_VIDEOS_DIR=');
+        putenv('PW_VIDEO_WIDTH=invalid');
+        $manager = $this->manager();
+
+        try {
+            $manager->create(BrowserType::Firefox, 'https://example.test', BrowserOptions::create()->withVideoSize(800, 600))->close();
+            $contexts = array_values(array_filter($this->messages, static fn (array $message): bool => 'newContext' === $message['action']));
+
+            $this->assertSame([], $contexts[0]['options']);
+        } finally {
+            $manager->close();
+        }
+    }
+
+    /**
+     * @param list<array<string, mixed>> $launches
+     */
+    private function assertLaunchOptions(array $launches, bool $headless, int $slowMo): void
+    {
+        $this->assertCount(2, $launches);
+
+        foreach ($launches as $launch) {
+            $this->assertSame($headless, $launch['options']['headless']);
+
+            if (0 === $slowMo) {
+                $this->assertArrayNotHasKey('slowMo', $launch['options']);
+            } else {
+                $this->assertSame($slowMo, $launch['options']['slowMo']);
+            }
+        }
+    }
+
     private function loadContexts(PlaywrightManager $manager, int $count): void
     {
         for ($i = 0; $i < $count; ++$i) {
@@ -284,37 +401,47 @@ final class PlaywrightManagerTest extends TestCase
         $transport
             ->method('send')
             ->willReturnCallback(
-                function (array $message) use ($connection): array {
-                    if (!$connection->connected) {
-                        throw new DisconnectedException('Transport stopped');
-                    }
-
-                    if ($this->failLaunch && 'launch' === $message['action']) {
-                        throw new DisconnectedException('Transport stopped during launch');
-                    }
-
-                    if ('context.close' === $message['action']) {
-                        ++$this->closedContexts;
-
-                        if ($this->failCleanup) {
-                            throw new \RuntimeException('Context cleanup failed');
-                        }
-                    }
-
-                    if ($this->failureAction === $message['action']) {
-                        throw new \RuntimeException('Session setup failed');
-                    }
-
-                    return match ($message['action']) {
-                        'launch' => ['browserId' => 'browser-'.++$this->launchCount, 'defaultContextId' => 'default-'.$this->launchCount, 'version' => 'test'],
-                        'newContext' => ['contextId' => 'context-'.++$this->contextCount],
-                        'context.newPage' => ['pageId' => 'page-'.$message['contextId']],
-                        default => [],
-                    };
-                },
+                fn (array $message): array => $this->respond($message, $connection->connected),
             )
         ;
 
         return $transport;
+    }
+
+    /**
+     * @param array<string, mixed> $message
+     *
+     * @return array<string, mixed>
+     */
+    private function respond(array $message, bool $connected): array
+    {
+        $this->messages[] = $message;
+
+        if (!$connected) {
+            throw new DisconnectedException('Transport stopped');
+        }
+
+        if ($this->failLaunch && 'launch' === $message['action']) {
+            throw new DisconnectedException('Transport stopped during launch');
+        }
+
+        if ('context.close' === $message['action']) {
+            ++$this->closedContexts;
+
+            if ($this->failCleanup) {
+                throw new \RuntimeException('Context cleanup failed');
+            }
+        }
+
+        if ($this->failureAction === $message['action']) {
+            throw new \RuntimeException('Session setup failed');
+        }
+
+        return match ($message['action']) {
+            'launch' => ['browserId' => 'browser-'.++$this->launchCount, 'defaultContextId' => 'default-'.$this->launchCount, 'version' => 'test'],
+            'newContext' => ['contextId' => 'context-'.++$this->contextCount],
+            'context.newPage' => ['pageId' => 'page-'.$message['contextId']],
+            default => [],
+        };
     }
 }

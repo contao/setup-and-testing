@@ -20,6 +20,10 @@ final class BrowserOptions
 
     private int|null $viewportHeight = null;
 
+    private int|null $videoWidth = null;
+
+    private int|null $videoHeight = null;
+
     private function __construct()
     {
     }
@@ -54,6 +58,29 @@ final class BrowserOptions
         $clone->viewportHeight = $height;
 
         return $clone;
+    }
+
+    public function withVideoSize(int $width, int $height): self
+    {
+        if ($width < 1 || $height < 1) {
+            throw new \InvalidArgumentException('The video dimensions must be positive integers.');
+        }
+
+        $clone = clone $this;
+        $clone->videoWidth = $width;
+        $clone->videoHeight = $height;
+
+        return $clone;
+    }
+
+    public function videoWidth(): int|null
+    {
+        return $this->videoWidth;
+    }
+
+    public function videoHeight(): int|null
+    {
+        return $this->videoHeight;
     }
 
     public function acceptLanguage(): string|null
