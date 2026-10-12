@@ -21,6 +21,7 @@ use PHPUnit\Framework\TestCase;
 use Symfony\Component\Console\Tester\CommandTester;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\HttpClient\HttpClient;
+use Symfony\Component\Process\Exception\ProcessTimedOutException;
 use Symfony\Component\Process\InputStream;
 use Symfony\Component\Process\Process;
 
@@ -262,14 +263,21 @@ final class ServerStartCommandTest extends TestCase
 
         $process = new Process($command);
         $process->setEnv(['CONTAO_INSPECTION_TEST_DIRECTORY' => $this->directory]);
-        $process->setTimeout(20);
+        // Include PHP startup, application preparation and process I/O on slower CI runners.
+        $process->setTimeout(60);
 
         return $process;
     }
 
     private function waitForApplication(Process $process): string
     {
-        $this->assertTrue($process->waitUntil(static fn (): bool => str_contains($process->getOutput(), 'Inspection session is running.')), $process->getErrorOutput());
+        try {
+            $ready = $process->waitUntil(static fn (): bool => str_contains($process->getOutput(), 'Inspection session is running.'));
+        } catch (ProcessTimedOutException $exception) {
+            $this->fail($exception->getMessage()."\n".$process->getOutput().$process->getErrorOutput());
+        }
+
+        $this->assertTrue($ready, $process->getOutput().$process->getErrorOutput());
         $this->assertSame(1, preg_match('~http://(?:localhost|127\.0\.0\.1):\d+/~', $process->getOutput(), $matches));
 
         return $matches[0];
