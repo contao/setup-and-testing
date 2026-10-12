@@ -51,7 +51,10 @@ final readonly class BackendBrowser
         $this->waitForNavigation(fn () => $this->page()->locator('button[name="login"]')->click());
     }
 
-    public function loginOrReuseSessionAs(string $username = 'k.jones', string $password = 'kevinjones'): self
+    /**
+     * @param (callable(self): void)|null $afterLogin Assertions run after a fresh login and before caching the session
+     */
+    public function loginOrReuseSessionAs(string $username = 'k.jones', string $password = 'kevinjones', callable|null $afterLogin = null): self
     {
         $userAgent = $this->page()->evaluate('() => navigator.userAgent');
 
@@ -82,6 +85,10 @@ final readonly class BackendBrowser
 
         if (null === $userLabel) {
             throw new \RuntimeException(\sprintf('Could not log into the Contao backend as "%s".', $username));
+        }
+
+        if (null !== $afterLogin) {
+            $afterLogin($this);
         }
 
         $this->loginSessions->save($key, $this->browser->context()->cookies([$this->browser->uri('/contao')]), $userLabel);

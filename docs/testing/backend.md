@@ -52,6 +52,23 @@ $backend->loginOrReuseSessionAs('content-editor', 'backend');
 
 The first call submits the normal login form. Later calls restore the authenticated cookies and open `/contao`. If Contao rejects the session, the helper logs in again. An unsuccessful login throws a `RuntimeException`. The helper returns the same `BackendBrowser` for chaining and requires a user that can log in without two-factor authentication.
 
+Pass an optional `afterLogin` callback for assertions that should run only after a fresh, successful login:
+
+```php
+use Contao\E2eTesting\Browser\BackendBrowser;
+
+$backend->loginOrReuseSessionAs(
+    afterLogin: function (BackendBrowser $backend): void {
+        $this->assertSame('Kevin Jones', $backend->page()->locator('#profileButton')->textContent());
+    },
+);
+```
+
+The callback receives the current `BackendBrowser`. It runs after authentication succeeds and before the session
+is cached, including when an expired cached session falls back to a fresh login. It is skipped when a valid cached
+session is reused or authentication fails. Assertion failures propagate and prevent caching that login. Omit the
+callback to keep the existing behavior.
+
 The underlying [session services](browsers.md#cache-and-restore-sessions) can be used with any web application. Only the login form and authenticated-user verification are specific to Contao.
 
 Managed Editions configure PHP session-file storage, which caches a clean copy of the matching PHP session files under `var/sessions`. Each reuse restores that copy with a fresh session ID, so database resets and server restarts can keep the authentication without carrying subsequent session changes into the next test. Sessions are separated by installation, application environment, username, password and browser user agent. The cache lives in memory for the test process and can span test classes using the same installation. Session reuse has been verified with Contao 5.3, 5.7 and 6.0. Browser and Managed Edition integration checks are opt-in for local runs.

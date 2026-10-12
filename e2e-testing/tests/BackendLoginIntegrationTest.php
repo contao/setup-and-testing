@@ -79,8 +79,13 @@ final class BackendLoginIntegrationTest extends TestCase
     #[DataProvider('browsers')]
     public function testReusesACleanSessionAfterAResetAndServerRestart(BrowserType $type): void
     {
+        $logins = [];
+        $afterLogin = function (BackendBrowser $backend) use (&$logins): void {
+            $this->assertSame('k.jones', $backend->page()->locator('h1')->textContent());
+            $logins[] = $backend;
+        };
         $first = $this->backend($type);
-        $this->assertSame($first, $first->loginOrReuseSessionAs());
+        $this->assertSame($first, $first->loginOrReuseSessionAs(afterLogin: $afterLogin));
         $this->assertSame('k.jones', $first->page()->locator('h1')->textContent());
         $first->visit('/mutate');
         $this->application->browserRuntime()->reset();
@@ -88,16 +93,17 @@ final class BackendLoginIntegrationTest extends TestCase
         $this->application->release();
         $this->application = $this->runtime->createApplication($this->applicationConfig());
 
-        $second = $this->backend($type)->loginOrReuseSessionAs();
+        $second = $this->backend($type)->loginOrReuseSessionAs(afterLogin: $afterLogin);
         $this->assertSame('k.jones', $second->page()->locator('h1')->textContent());
         $this->assertSame('clean', $second->page()->locator('#state')->textContent());
         $this->assertSame('1', file_get_contents($this->directory.'/logins'));
         $firstId = $this->sessionId($second);
-        $third = $this->backend($type)->loginOrReuseSessionAs('k.jones');
+        $third = $this->backend($type)->loginOrReuseSessionAs('k.jones', afterLogin: $afterLogin);
         $this->assertNotSame($firstId, $this->sessionId($third));
         $second->visit('/mutate');
         $third->visit('/contao');
         $this->assertSame('clean', $third->page()->locator('#state')->textContent());
+        $this->assertSame([$first], $logins);
     }
 
     public function testInvalidRemoteSessionFallsBackToLoginAndSwitchesUsers(): void
@@ -108,7 +114,12 @@ final class BackendLoginIntegrationTest extends TestCase
         $first->visit('/contao/logout');
 
         $second = new BackendBrowser($this->application->createBrowser(), $cache);
-        $second->loginOrReuseSessionAs('k.jones');
+        $logins = [];
+        $second->loginOrReuseSessionAs('k.jones', afterLogin: function (BackendBrowser $backend) use (&$logins): void {
+            $this->assertSame('k.jones', $backend->page()->locator('h1')->textContent());
+            $logins[] = $backend;
+        });
+        $this->assertSame([$second], $logins);
         $this->assertSame('2', file_get_contents($this->directory.'/logins'));
         $second->loginOrReuseSessionAs('other', 'custom');
         $this->assertSame('other', $second->page()->locator('h1')->textContent());
@@ -139,17 +150,40 @@ final class BackendLoginIntegrationTest extends TestCase
     public function testFailedLoginDoesNotPopulateTheCache(): void
     {
         $backend = $this->backend();
+        $logins = [];
+        $afterLogin = static function (BackendBrowser $browser) use (&$logins): void {
+            $logins[] = $browser;
+        };
 
         try {
-            $backend->loginOrReuseSessionAs('k.jones', 'wrong');
+            $backend->loginOrReuseSessionAs('k.jones', 'wrong', $afterLogin);
             $this->fail('An unsuccessful login must throw.');
         } catch (\RuntimeException $exception) {
             $this->assertStringContainsString('Could not log into', $exception->getMessage());
         }
 
+        $this->assertSame([], $logins);
         $backend->loginOrReuseSessionAs('k.jones');
         $this->assertSame('k.jones', $backend->page()->locator('h1')->textContent());
         $this->assertSame('1', file_get_contents($this->directory.'/logins'));
+    }
+
+    public function testAssertionFailureDoesNotPopulateTheLoginSessionCache(): void
+    {
+        $backend = $this->backend();
+
+        try {
+            $backend->loginOrReuseSessionAs(afterLogin: function (BackendBrowser $browser): void {
+                $this->assertSame('unexpected-user', $browser->page()->locator('h1')->textContent(), 'Login assertion failed.');
+            });
+            $this->fail('An assertion failure must propagate.');
+        } catch (\Throwable $exception) {
+            $this->assertStringContainsString('Login assertion failed.', $exception->getMessage());
+        }
+
+        $backend->loginOrReuseSessionAs();
+        $this->assertSame('k.jones', $backend->page()->locator('h1')->textContent());
+        $this->assertSame('2', file_get_contents($this->directory.'/logins'));
     }
 
     private function applicationConfig(): LocalApplicationConfig
