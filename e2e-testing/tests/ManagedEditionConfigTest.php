@@ -76,6 +76,22 @@ final class ManagedEditionConfigTest extends TestCase
         $this->assertSame('dev', $dev->withDatabase(DockerDatabaseConfig::mysql('mysql:8.0'))->appEnvironment);
     }
 
+    public function testRetainsEnvironmentOverridesAcrossConfigurationChanges(): void
+    {
+        $recipe = InstallationRecipe::create(ComposerConfig::managedEdition('^5.7'));
+        $base = ManagedEditionConfig::create($recipe, \dirname(__DIR__, 2));
+        $variables = ['RECIPE_OPTION' => 'fixture', 'DISABLE_HTTP_CACHE' => false];
+        $configured = $base->withEnvironmentVariables($variables)
+            ->withAppEnvironment('dev')
+            ->withResetMode(DatabaseResetMode::RECREATE_SCHEMA)
+            ->withSimulatedOrigins()
+            ->withDatabase(DockerDatabaseConfig::mysql('mysql:8.0'))
+        ;
+
+        $this->assertSame([], $base->environmentVariables());
+        $this->assertSame($variables, $configured->environmentVariables());
+    }
+
     public function testSimulatedOriginsAreOptInAndUseOnlyLoopbackProxyHeaders(): void
     {
         $recipe = InstallationRecipe::create(ComposerConfig::managedEdition('^5.7'));

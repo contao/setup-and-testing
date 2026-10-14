@@ -46,13 +46,18 @@ final readonly class InstallationBuilder
 
         if ($applicationChanged) {
             $this->applicationPreparer->prepare($config, $directory, $manifest);
+            // Track copied targets before autoload generation or setup can fail.
+            $this->writeApplicationManifest($config, $installation, complete: false);
+            $this->composerInstaller->refreshAutoload($config, $directory);
             $this->contaoConsole->setup($directory, $database->applicationUrl());
-            $this->writeApplicationManifest($config, $installation);
         }
 
         if ($applicationChanged || !$database->hasSchema()) {
+            // A failed migration must remain pending even if it created part of the schema.
+            $this->writeApplicationManifest($config, $installation, complete: false);
             $this->cache->clear();
             $this->contaoConsole->migrate($directory, $database->applicationUrl());
+            $this->writeApplicationManifest($config, $installation);
         }
 
         $database->reset($config->recipe->fixtures);
@@ -67,6 +72,8 @@ final readonly class InstallationBuilder
         $filesystem->mkdir($buildDirectory);
 
         try {
+            // Composer plugins may load recipe bootstrap classes during autoload generation.
+            $this->applicationPreparer->prepare($config, $buildDirectory, null);
             $this->composerInstaller->install($config, $buildDirectory);
             $filesystem->remove($directory);
             $filesystem->rename($buildDirectory, $directory);
@@ -76,16 +83,17 @@ final readonly class InstallationBuilder
             throw $exception;
         }
 
-        (new InstallationManifest($installation->fingerprints->dependency))->write($manifestPath);
+        $mappedTargets = array_map(static fn ($mapping) => $mapping->target, $config->recipe->assets->fileMappings);
+        (new InstallationManifest($installation->fingerprints->dependency, mappedTargets: $mappedTargets))->write($manifestPath);
     }
 
-    private function writeApplicationManifest(ManagedEditionConfig $config, InstallationWorkspace $installation): void
+    private function writeApplicationManifest(ManagedEditionConfig $config, InstallationWorkspace $installation, bool $complete = true): void
     {
         $directory = $installation->directory;
         $mappedTargets = array_map(static fn ($mapping) => $mapping->target, $config->recipe->assets->fileMappings);
         (new InstallationManifest(
             $installation->fingerprints->dependency,
-            $installation->fingerprints->application,
+            $complete ? $installation->fingerprints->application : null,
             $mappedTargets,
         ))->write(Path::join($directory, '.contao-e2e-manifest.json'));
     }

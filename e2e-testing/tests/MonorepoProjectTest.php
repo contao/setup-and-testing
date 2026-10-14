@@ -57,6 +57,15 @@ final class MonorepoProjectTest extends TestCase
         $this->assertSame('packages/example', $config['repositories'][0]['url']);
     }
 
+    public function testLeavesComposerUntouchedWhenNoPackagesAreSelected(): void
+    {
+        $directory = $this->createMonorepo(['version' => '2.3.x-dev']);
+        $composer = ComposerConfig::managedEdition('^5.7');
+
+        $this->assertSame($composer, MonorepoProject::discover($directory)->configureComposer($composer));
+        $this->assertSame(['contao/manager-bundle' => '^5.7'], $composer->toArray($directory)['require']);
+    }
+
     /**
      * @param array<string, mixed> $composer
      */

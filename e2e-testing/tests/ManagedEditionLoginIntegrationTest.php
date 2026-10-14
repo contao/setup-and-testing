@@ -61,7 +61,7 @@ final class ManagedEditionLoginIntegrationTest extends TestCase
         $dbal = getenv('CONTAO_E2E_LOGIN_DBAL_VERSION');
 
         if (false !== $dbal && '' !== $dbal) {
-            $composer = $composer->require('doctrine/dbal', $dbal);
+            $composer = $composer->withOverrides(['require' => ['doctrine/dbal' => $dbal]]);
         }
 
         return InstallationRecipe::create($composer)->withFixtureFile(__DIR__.'/Fixtures/backend-login/users.yaml');

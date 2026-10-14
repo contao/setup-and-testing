@@ -19,37 +19,39 @@ final class ComposerConfig
 {
     /**
      * @param array<string, mixed> $config
-     * @param list<PathPackage>    $pathPackages
      */
     private function __construct(
-        private readonly array $config,
-        private readonly array $pathPackages = [],
+        private array $config,
+        private readonly string $directory,
     ) {
     }
 
     public static function managedEdition(string $constraint): self
     {
-        return new self([
-            'name' => 'contao/e2e-managed-edition',
-            'description' => 'Temporary Contao Managed Edition for end-to-end tests',
-            'type' => 'project',
-            'license' => 'proprietary',
-            'require' => ['contao/manager-bundle' => $constraint],
-            'scripts' => [
-                'post-install-cmd' => ['@php vendor/bin/contao-setup'],
-                'post-update-cmd' => ['@php vendor/bin/contao-setup'],
-            ],
-            'config' => [
-                'allow-plugins' => [
-                    'contao-components/installer' => true,
-                    'contao/manager-plugin' => true,
-                    'php-http/discovery' => false,
+        return new self(
+            [
+                'name' => 'contao/e2e-managed-edition',
+                'description' => 'Temporary Contao Managed Edition for end-to-end tests',
+                'type' => 'project',
+                'license' => 'proprietary',
+                'require' => ['contao/manager-bundle' => $constraint],
+                'scripts' => [
+                    'post-install-cmd' => ['@php vendor/bin/contao-setup'],
+                    'post-update-cmd' => ['@php vendor/bin/contao-setup'],
+                ],
+                'config' => [
+                    'allow-plugins' => [
+                        'contao-components/installer' => true,
+                        'contao/manager-plugin' => true,
+                        'php-http/discovery' => false,
+                    ],
+                ],
+                'extra' => [
+                    'contao-component-dir' => 'assets',
                 ],
             ],
-            'extra' => [
-                'contao-component-dir' => 'assets',
-            ],
-        ]);
+            (string) getcwd(),
+        );
     }
 
     public static function fromFile(string $path): self
@@ -68,23 +70,21 @@ final class ComposerConfig
             throw new InvalidRecipeException(\sprintf('The Composer file "%s" must contain a JSON object.', $path));
         }
 
-        return new self($config);
+        return (new self([], Path::makeAbsolute(\dirname($path), (string) getcwd())))->withOverrides($config);
     }
 
-    public function require(string $package, string $constraint): self
+    /**
+     * @param array<string, mixed> $overrides
+     */
+    public function withOverrides(array $overrides): self
     {
-        $config = $this->config;
-        $config['require'][$package] = $constraint;
+        $clone = clone $this;
+        $clone->config = $this->mergeConfig($this->config, $overrides);
+        if (isset($clone->config['repositories']) && \is_array($clone->config['repositories'])) {
+            $clone->config['repositories'] = (new PathRepositoryPaths())->resolve($clone->config['repositories'], $this->directory);
+        }
 
-        return new self($config, $this->pathPackages);
-    }
-
-    public function withPathPackage(string $package, string $path, string $version): self
-    {
-        $pathPackages = $this->pathPackages;
-        $pathPackages[] = new PathPackage($package, Path::canonicalize($path), $version);
-
-        return $this->require($package, $version)->withPathPackages($pathPackages);
+        return $clone;
     }
 
     /**
@@ -94,8 +94,8 @@ final class ComposerConfig
     {
         $config = $this->config;
 
-        foreach ($this->pathPackages as $pathPackage) {
-            $config['repositories'][] = $pathPackage->toComposerRepository($targetDirectory);
+        if (isset($config['repositories']) && \is_array($config['repositories'])) {
+            $config['repositories'] = (new PathRepositoryPaths())->relativize($config['repositories'], $targetDirectory);
         }
 
         if (isset($config['require']) && \is_array($config['require'])) {
@@ -111,18 +111,21 @@ final class ComposerConfig
     }
 
     /**
-     * @return list<PathPackage>
+     * @param array<array-key, mixed> $base
+     * @param array<array-key, mixed> $overrides
+     *
+     * @return array<array-key, mixed>
      */
-    public function pathPackages(): array
+    private function mergeConfig(array $base, array $overrides): array
     {
-        return $this->pathPackages;
-    }
+        foreach ($overrides as $key => $value) {
+            if (\is_array($value) && !array_is_list($value) && isset($base[$key]) && \is_array($base[$key]) && !array_is_list($base[$key])) {
+                $value = $this->mergeConfig($base[$key], $value);
+            }
 
-    /**
-     * @param list<PathPackage> $pathPackages
-     */
-    private function withPathPackages(array $pathPackages): self
-    {
-        return new self($this->config, $pathPackages);
+            $base[$key] = $value;
+        }
+
+        return $base;
     }
 }

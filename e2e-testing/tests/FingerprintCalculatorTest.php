@@ -17,8 +17,10 @@ use Contao\E2eTesting\Cache\SourceFingerprint;
 use Contao\E2eTesting\Cache\WorkspaceInitializer;
 use Contao\E2eTesting\Installation\InstallationPool;
 use Contao\E2eTesting\ManagedEdition\ManagedEditionConfig;
+use Contao\E2eTesting\Process\ProcessRunner;
 use Contao\InstallationRecipe\Composer\ComposerConfig;
 use Contao\InstallationRecipe\Recipe\InstallationRecipe;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Filesystem\Filesystem;
 
@@ -52,6 +54,51 @@ final class FingerprintCalculatorTest extends TestCase
         $this->assertNotSame($dcaChanged->application, $sourceChanged->application);
     }
 
+    #[DataProvider('provideRepositoriesThatMayBeCopied')]
+    public function testPathPackagesThatMayBeCopiedRebuildDependenciesWhenSourcesChange(bool|null $symlink, bool $withSymlinkRepository): void
+    {
+        $directory = $this->createInputDirectory();
+        $calculator = new FingerprintCalculator(new SourceFingerprint());
+        $config = $this->config($directory);
+        $composer = $config->recipe->composer;
+        $repositories = $composer->toArray($directory)['repositories'];
+        $repositories[0]['url'] = $directory.'/source';
+        if (null === $symlink) {
+            unset($repositories[0]['options']['symlink']);
+        } else {
+            $repositories[0]['options']['symlink'] = $symlink;
+        }
+        if ($withSymlinkRepository) {
+            $linkedRepository = $repositories[0];
+            $linkedRepository['options']['symlink'] = true;
+            $repositories[] = $linkedRepository;
+        }
+
+        $recipe = $config->recipe->withComposer($composer->withOverrides(['repositories' => $repositories]));
+        $config = ManagedEditionConfig::create($recipe, $directory);
+
+        try {
+            $initial = $calculator->calculate($config);
+            (new Filesystem())->dumpFile($directory.'/source/Example.php', '<?php return 2;');
+            $changed = $calculator->calculate($config);
+
+            $this->assertNotSame($initial->dependency, $changed->dependency);
+            $this->assertNotSame($initial->application, $changed->application);
+        } finally {
+            (new Filesystem())->remove($directory);
+        }
+    }
+
+    /**
+     * @return iterable<string, array{bool|null, bool}>
+     */
+    public static function provideRepositoriesThatMayBeCopied(): iterable
+    {
+        yield 'forced mirroring' => [false, false];
+        yield 'automatic fallback' => [null, false];
+        yield 'same path also has a symlink repository' => [false, true];
+    }
+
     public function testAppEnvironmentInvalidatesThePreparedApplication(): void
     {
         $directory = $this->createInputDirectory();
@@ -63,6 +110,24 @@ final class FingerprintCalculatorTest extends TestCase
 
             $this->assertSame($prod->dependency, $dev->dependency);
             $this->assertNotSame($prod->application, $dev->application);
+        } finally {
+            (new Filesystem())->remove($directory);
+        }
+    }
+
+    public function testEnvironmentOverridesInvalidateThePreparedApplication(): void
+    {
+        $directory = $this->createInputDirectory();
+        $calculator = new FingerprintCalculator(new SourceFingerprint());
+
+        try {
+            $config = $this->config($directory);
+            $initial = $calculator->calculate($config);
+            $changed = $calculator->calculate($config->withEnvironmentVariables(['RECIPE_OPTION' => 'fixture']));
+
+            $this->assertSame($initial->dependency, $changed->dependency);
+            $this->assertNotSame($initial->application, $changed->application);
+            $this->assertNotSame($initial->data, $changed->data);
         } finally {
             (new Filesystem())->remove($directory);
         }
@@ -124,6 +189,47 @@ final class FingerprintCalculatorTest extends TestCase
         }
     }
 
+    public function testInferredPathPackageVersionsInvalidateDependenciesWhenTheGitBranchChanges(): void
+    {
+        $directory = sys_get_temp_dir().'/path-package-version-'.bin2hex(random_bytes(6));
+        $filesystem = new Filesystem();
+        $filesystem->mkdir($directory);
+
+        $project = \dirname(__DIR__, 2);
+        $runner = new ProcessRunner();
+
+        try {
+            // Reuse existing commits without creating any commits in the fixture repository.
+            $runner->run(['git', 'clone', '--shared', '--quiet', $project, $directory.'/source'], $directory);
+            $filesystem->dumpFile($directory.'/fingerprint.php', <<<'PHP'
+                <?php
+                require $argv[1];
+                $composer = \Contao\InstallationRecipe\Composer\ComposerConfig::managedEdition('^5.7')->withOverrides([
+                    'repositories' => [[
+                        'type' => 'path',
+                        'url' => $argv[2].'/installation-recipe',
+                        'options' => ['symlink' => true],
+                    ]],
+                ]);
+                $recipe = \Contao\InstallationRecipe\Recipe\InstallationRecipe::create($composer);
+                $config = \Contao\E2eTesting\ManagedEdition\ManagedEditionConfig::create($recipe, $argv[2]);
+                $calculator = new \Contao\E2eTesting\Cache\FingerprintCalculator(new \Contao\E2eTesting\Cache\SourceFingerprint());
+                echo $calculator->calculate($config)->dependency;
+                PHP);
+            $command = [PHP_BINARY, $directory.'/fingerprint.php', $project.'/vendor/autoload.php', $directory.'/source'];
+            $runner->run(['git', 'checkout', '--quiet', '-b', 'cached-version-first'], $directory.'/source');
+            $first = $runner->run($command, $directory, ['COMPOSER_ROOT_VERSION' => false]);
+            $firstCommit = $runner->run(['git', 'rev-parse', 'HEAD'], $directory.'/source');
+            $runner->run(['git', 'checkout', '--quiet', '-b', 'cached-version-second'], $directory.'/source');
+            $second = $runner->run($command, $directory, ['COMPOSER_ROOT_VERSION' => false]);
+
+            $this->assertSame($firstCommit, $runner->run(['git', 'rev-parse', 'HEAD'], $directory.'/source'));
+            $this->assertNotSame($first, $second);
+        } finally {
+            $filesystem->remove($directory);
+        }
+    }
+
     private function createInputDirectory(): string
     {
         $directory = \dirname(__DIR__, 2).'/.contao-e2e/runtime/unit-tests/fingerprint-'.bin2hex(random_bytes(6));
@@ -141,17 +247,22 @@ final class FingerprintCalculatorTest extends TestCase
     private function config(string $directory): ManagedEditionConfig
     {
         $composer = ComposerConfig::managedEdition('^5.7')
-            ->withPathPackage('acme/example', $directory.'/source', '1.0.x-dev')
+            ->withOverrides([
+                'require' => ['acme/example' => '1.0.x-dev'],
+                'repositories' => [[
+                    'type' => 'path',
+                    'url' => $directory.'/source',
+                    'options' => ['symlink' => true, 'versions' => ['acme/example' => '1.0.x-dev']],
+                ]],
+            ])
+            ->withOverrides(['extra' => ['example' => false]])
         ;
 
         $recipe = InstallationRecipe::create($composer)
             ->withConfigFile($directory.'/config.yaml')
             ->withFixtureFile($directory.'/fixture.yaml')
         ;
-        putenv('CONTAO_E2E_DATABASE_URL=mysql://root@127.0.0.1');
-        $config = ManagedEditionConfig::create($recipe, $directory)->withDcaFile($directory.'/tl_content.php');
-        putenv('CONTAO_E2E_DATABASE_URL');
 
-        return $config;
+        return ManagedEditionConfig::create($recipe, $directory)->withDcaFile($directory.'/tl_content.php');
     }
 }

@@ -56,6 +56,32 @@ final class ContaoConsoleTest extends TestCase
         }
     }
 
+    public function testEnvironmentOverridesAreLocalToConsoleProcesses(): void
+    {
+        $directory = sys_get_temp_dir().'/contao-e2e-console-'.bin2hex(random_bytes(8));
+        $filesystem = new Filesystem();
+        $script = '<?php echo json_encode([getenv("APP_ENV"), getenv("DATABASE_URL"), getenv("DISABLE_HTTP_CACHE"), getenv("RECIPE_OPTION")]);';
+        $filesystem->dumpFile($directory.'/vendor/bin/contao-console', $script);
+        $filesystem->dumpFile($directory.'/vendor/bin/contao-setup', $script);
+
+        $original = getenv('RECIPE_OPTION');
+        $runner = new ProcessRunner();
+        $console = new ContaoConsole($runner, environment: [
+            'APP_ENV' => 'test',
+            'DATABASE_URL' => 'sqlite:///:memory:',
+            'DISABLE_HTTP_CACHE' => false,
+            'RECIPE_OPTION' => 'fixture',
+        ]);
+
+        try {
+            $output = $console->run($directory, 'mysql://localhost/test', ['app:example']);
+            $this->assertSame(['test', 'sqlite:///:memory:', false, 'fixture'], json_decode($output, true, flags: JSON_THROW_ON_ERROR));
+            $this->assertSame($original, getenv('RECIPE_OPTION'));
+        } finally {
+            $filesystem->remove($directory);
+        }
+    }
+
     public function testRunThrowsWhenTheCommandFails(): void
     {
         $directory = sys_get_temp_dir().'/contao-e2e-console-'.bin2hex(random_bytes(8));

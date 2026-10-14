@@ -32,6 +32,11 @@ final class ManagedEditionConfig implements ApplicationConfigInterface
 {
     private PhpServerConfig $phpServer;
 
+    /**
+     * @var array<string, string|false>
+     */
+    private array $environmentVariables = [];
+
     private function __construct(
         public readonly InstallationRecipe $recipe,
         public readonly ManagedEditionEnvironment $environment,
@@ -80,9 +85,28 @@ final class ManagedEditionConfig implements ApplicationConfigInterface
         return $clone;
     }
 
+    /**
+     * @return array<string, string|false>
+     */
+    public function environmentVariables(): array
+    {
+        return $this->environmentVariables;
+    }
+
+    /**
+     * @param array<string, string|false> $environment
+     */
+    public function withEnvironmentVariables(array $environment): self
+    {
+        $clone = clone $this;
+        $clone->environmentVariables = $environment;
+
+        return $clone;
+    }
+
     public function withEnvironment(ManagedEditionEnvironment $environment): self
     {
-        return (new self($this->recipe, $environment, $this->resetMode, $this->appEnvironment))->withPhpServer($this->phpServer);
+        return (new self($this->recipe, $environment, $this->resetMode, $this->appEnvironment))->withPhpServer($this->phpServer)->withEnvironmentVariables($this->environmentVariables);
     }
 
     public function withDatabase(DatabaseServerConfig|DockerDatabaseConfig $database): self
@@ -113,7 +137,7 @@ final class ManagedEditionConfig implements ApplicationConfigInterface
 
         $mapping = new FileMapping($path, 'contao/dca/'.basename($path));
 
-        return (new self($this->recipe->withFileMapping($mapping), $this->environment, $this->resetMode, $this->appEnvironment))->withPhpServer($this->phpServer);
+        return (new self($this->recipe->withFileMapping($mapping), $this->environment, $this->resetMode, $this->appEnvironment))->withPhpServer($this->phpServer)->withEnvironmentVariables($this->environmentVariables);
     }
 
     public function withSimulatedOrigins(): self
@@ -126,16 +150,16 @@ final class ManagedEditionConfig implements ApplicationConfigInterface
             }
         }
 
-        return (new self($this->recipe->withConfigFile($path), $this->environment, $this->resetMode, $this->appEnvironment))->withPhpServer($this->phpServer);
+        return (new self($this->recipe->withConfigFile($path), $this->environment, $this->resetMode, $this->appEnvironment))->withPhpServer($this->phpServer)->withEnvironmentVariables($this->environmentVariables);
     }
 
     public function withResetMode(DatabaseResetMode $resetMode): self
     {
-        return (new self($this->recipe, $this->environment, $resetMode, $this->appEnvironment))->withPhpServer($this->phpServer);
+        return (new self($this->recipe, $this->environment, $resetMode, $this->appEnvironment))->withPhpServer($this->phpServer)->withEnvironmentVariables($this->environmentVariables);
     }
 
     public function withAppEnvironment(string $appEnvironment): self
     {
-        return (new self($this->recipe, $this->environment, $this->resetMode, $appEnvironment))->withPhpServer($this->phpServer);
+        return (new self($this->recipe, $this->environment, $this->resetMode, $appEnvironment))->withPhpServer($this->phpServer)->withEnvironmentVariables($this->environmentVariables);
     }
 }

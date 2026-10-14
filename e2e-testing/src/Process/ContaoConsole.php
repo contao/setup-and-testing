@@ -16,9 +16,13 @@ use Symfony\Component\Filesystem\Path;
 
 final readonly class ContaoConsole
 {
+    /**
+     * @param array<string, string|false> $environment
+     */
     public function __construct(
         private ProcessRunnerInterface $processRunner,
         private string $appEnvironment = 'prod',
+        private array $environment = [],
     ) {
     }
 
@@ -67,11 +71,11 @@ final readonly class ContaoConsole
     }
 
     /**
-     * @return array<string, string>
+     * @return array<string, string|false>
      */
     private function environment(string $databaseUrl): array
     {
-        return [
+        return $this->environment + [
             'APP_ENV' => $this->appEnvironment,
             'DATABASE_URL' => $databaseUrl,
             'DISABLE_HTTP_CACHE' => '1',

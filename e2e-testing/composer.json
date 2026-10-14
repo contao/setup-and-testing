@@ -6,6 +6,7 @@
     "require": {
         "php": "^8.2",
         "composer-runtime-api": "^2.1",
+        "composer/composer": "^2.9",
         "contao/installation-recipe": "self.version",
         "doctrine/dbal": "^3.6 || ^4.0",
         "phpunit/phpunit": "^10.5 || ^11.5 || ^12.0 || ^13.0",

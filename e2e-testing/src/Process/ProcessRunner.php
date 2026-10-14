@@ -18,12 +18,12 @@ use Symfony\Component\Process\Process;
 final readonly class ProcessRunner implements ProcessRunnerInterface
 {
     /**
-     * @param list<string>          $command
-     * @param array<string, string> $environment
+     * @param list<string>                $command
+     * @param array<string, string|false> $environment
      */
     public function run(array $command, string $directory, array $environment = []): string
     {
-        $environment['XDEBUG_MODE'] = 'off';
+        $environment += ['XDEBUG_MODE' => 'off'];
         $process = new Process($command, $directory, $environment + $this->environment());
         $process->setTimeout(900);
         $process->run();

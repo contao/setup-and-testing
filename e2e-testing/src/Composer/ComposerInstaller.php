@@ -29,7 +29,7 @@ final readonly class ComposerInstaller
     {
         $this->filesystem->dumpFile(Path::join($directory, 'composer.json'), $config->recipe->composer->toJson($directory));
         $runConfig = $config->environment->composer;
-        $command = [$runConfig->executable, 'update', '--no-interaction', '--no-progress', '--no-scripts'];
+        $command = ['update', '--no-progress'];
 
         if ($runConfig->preferLowest) {
             $command[] = '--prefer-lowest';
@@ -39,8 +39,21 @@ final readonly class ComposerInstaller
             $command[] = '--prefer-stable';
         }
 
+        $this->run($config, $directory, $command);
+    }
+
+    public function refreshAutoload(ManagedEditionConfig $config, string $directory): void
+    {
+        $this->run($config, $directory, ['dump-autoload']);
+    }
+
+    /**
+     * @param list<string> $command
+     */
+    private function run(ManagedEditionConfig $config, string $directory, array $command): void
+    {
         $this->processRunner->run(
-            $command,
+            [$config->environment->composer->executable, ...$command, '--no-interaction', '--no-scripts'],
             $directory,
             [
                 'COMPOSER_CACHE_DIR' => $config->environment->cache->composerCacheDirectory(),

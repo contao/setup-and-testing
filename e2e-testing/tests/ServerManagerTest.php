@@ -76,6 +76,29 @@ class ServerManagerTest extends TestCase
         }
     }
 
+    public function testEnvironmentOverridesAreLocalToTheHttpServer(): void
+    {
+        $filesystem = new Filesystem();
+        $directory = sys_get_temp_dir().'/contao-e2e-server-'.bin2hex(random_bytes(8));
+        $filesystem->dumpFile($directory.'/public/index.php', '<?php echo json_encode([getenv("APP_ENV"), getenv("DATABASE_URL"), getenv("DISABLE_HTTP_CACHE"), getenv("RECIPE_OPTION")]);');
+        $original = getenv('RECIPE_OPTION');
+        $server = (new ServerManager(environment: [
+            'APP_ENV' => 'test',
+            'DATABASE_URL' => 'sqlite:///:memory:',
+            'DISABLE_HTTP_CACHE' => false,
+            'RECIPE_OPTION' => 'fixture',
+        ]))->start($directory, 'mysql://localhost/test', $directory.'/runtime');
+
+        try {
+            $response = HttpClient::create()->request('GET', 'http://127.0.0.1:'.$server->port.'/');
+            $this->assertSame(['test', 'sqlite:///:memory:', false, 'fixture'], $response->toArray());
+            $this->assertSame($original, getenv('RECIPE_OPTION'));
+        } finally {
+            $server->stop();
+            $filesystem->remove($directory);
+        }
+    }
+
     public function testSharedServerPreservesContaoRoutingEnvironmentAndShutdown(): void
     {
         $filesystem = new Filesystem();

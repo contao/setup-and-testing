@@ -18,11 +18,15 @@ use Symfony\Component\Filesystem\Path;
 
 final readonly class ServerManager
 {
+    /**
+     * @param array<string, string|false> $environment
+     */
     public function __construct(
         private Filesystem $filesystem = new Filesystem(),
         private FreePortFinder $portFinder = new FreePortFinder(),
         private string $appEnvironment = 'prod',
         private PhpServerConfig $phpServer = new PhpServerConfig(),
+        private array $environment = [],
     ) {
     }
 
@@ -36,7 +40,7 @@ final readonly class ServerManager
 
         $config = WebServerConfig::php($directory, router: $routerFile)
             ->withPhpServer($this->phpServer)
-            ->withEnvironment([
+            ->withEnvironment($this->environment + [
                 'APP_ENV' => $this->appEnvironment,
                 'DATABASE_URL' => $databaseUrl,
                 'DISABLE_HTTP_CACHE' => '1',

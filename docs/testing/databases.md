@@ -122,7 +122,14 @@ final class ManagedEditionSmokeTest extends TestCase implements DockerServicePro
     {
         $bundleRoot = dirname(__DIR__, 2);
         $composer = ComposerConfig::managedEdition('^5.7')
-            ->withPathPackage('acme/example-bundle', $bundleRoot, '1.0.x-dev');
+            ->withOverrides([
+                'require' => ['acme/example-bundle' => '1.0.x-dev'],
+                'repositories' => [[
+                    'type' => 'path',
+                    'url' => $bundleRoot,
+                    'options' => ['symlink' => true, 'versions' => ['acme/example-bundle' => '1.0.x-dev']],
+                ]],
+            ]);
 
         return ManagedEditionConfig::create(InstallationRecipe::create($composer), $bundleRoot);
     }

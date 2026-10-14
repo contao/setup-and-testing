@@ -35,7 +35,14 @@ final class ManagedEditionSmokeTest extends AbstractManagedEditionTestCase
     {
         $bundleRoot = dirname(__DIR__, 2);
         $composer = ComposerConfig::managedEdition('^5.7')
-            ->withPathPackage('acme/example-bundle', $bundleRoot, '1.0.x-dev');
+            ->withOverrides([
+                'require' => ['acme/example-bundle' => '1.0.x-dev'],
+                'repositories' => [[
+                    'type' => 'path',
+                    'url' => $bundleRoot,
+                    'options' => ['symlink' => true, 'versions' => ['acme/example-bundle' => '1.0.x-dev']],
+                ]],
+            ]);
 
         return ManagedEditionConfig::create(InstallationRecipe::create($composer), $bundleRoot);
     }
@@ -69,7 +76,7 @@ From the bundle root, run:
 vendor/bin/phpunit --configuration=phpunit.xml.dist tests/E2e/ManagedEditionSmokeTest.php
 ```
 
-`withPathPackage()` makes Composer require your bundle from its local directory and symlink it into the Managed Edition's `vendor/`. The test sees the current working tree, including uncommitted PHP changes. Source changes invalidate the cached application setup on the next test process. Changes to a linked bundle's `composer.json` select a fresh dependency installation so Composer resolves the new requirements.
+The `require` entry and path repository make Composer install your bundle from its local directory and symlink it into the Managed Edition's `vendor/`. The test sees the current working tree, including uncommitted PHP changes. Source changes invalidate the cached application setup on the next test process. Changes to a linked bundle's `composer.json` select a fresh dependency installation so Composer resolves the new requirements.
 
 ## Expected result and next steps
 

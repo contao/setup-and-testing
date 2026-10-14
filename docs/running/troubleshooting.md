@@ -22,7 +22,7 @@ Check that the configured working directory and PHP document root exist. Custom 
 
 ## Composer cannot resolve local packages
 
-Check each package name, path and dependency constraint. The version passed to `withPathPackage()` must satisfy constraints from other packages. In a monorepo, inspect the root version or `dev-main` branch alias used by `MonorepoProject`. See [Contao package monorepo tests](../guides/monorepo.md).
+Check each package name, path and dependency constraint. The version configured in the path repository’s `options.versions` must satisfy constraints from other packages. In a monorepo, inspect the root version or `dev-main` branch alias used by `MonorepoProject`. See [Contao package monorepo tests](../guides/monorepo.md).
 
 ## Tests affect one another
 

@@ -57,7 +57,7 @@ final readonly class ManagedEditionFactory
         $database = $this->createDatabase($databaseServer, $databaseName);
         $installation = new PreparedInstallation($lease, $database, $fingerprints);
         $processRunner = new ProcessRunner();
-        $console = new ContaoConsole($processRunner, $config->appEnvironment);
+        $console = new ContaoConsole($processRunner, $config->appEnvironment, $config->environmentVariables());
         $builder = new InstallationBuilder(
             new ComposerInstaller($processRunner),
             new ApplicationPreparer(),
@@ -76,7 +76,7 @@ final readonly class ManagedEditionFactory
 
         return new ManagedEdition(
             new ManagedEditionState($installation, $config, $console),
-            new ServerManager(appEnvironment: $config->appEnvironment, phpServer: $config->phpServer()),
+            new ServerManager(appEnvironment: $config->appEnvironment, phpServer: $config->phpServer(), environment: $config->environmentVariables()),
             $this->applicationRuntime->createBrowserRuntime(Path::join($cache->rootDirectory, 'traces')),
             $this->applicationRuntime,
         );

@@ -17,7 +17,17 @@ use PHPUnit\Framework\TestCase;
 
 class ProcessRunnerTest extends TestCase
 {
-    public function testDisablesXdebug(): void
+    public function testDisablesXdebugByDefault(): void
+    {
+        $output = (new ProcessRunner())->run(
+            [PHP_BINARY, '-r', 'echo getenv("XDEBUG_MODE");'],
+            sys_get_temp_dir(),
+        );
+
+        $this->assertSame('off', $output);
+    }
+
+    public function testRespectsExplicitEnvironmentOverrides(): void
     {
         $output = (new ProcessRunner())->run(
             [PHP_BINARY, '-r', 'echo getenv("XDEBUG_MODE");'],
@@ -25,6 +35,6 @@ class ProcessRunnerTest extends TestCase
             ['XDEBUG_MODE' => 'debug'],
         );
 
-        $this->assertSame('off', $output);
+        $this->assertSame('debug', $output);
     }
 }

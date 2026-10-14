@@ -71,7 +71,14 @@ use Contao\InstallationRecipe\Recipe\InstallationRecipe;
 
 $projectRoot = dirname(__DIR__);
 $composer = ComposerConfig::managedEdition('^6.0')
-    ->withPathPackage('acme/example-bundle', $projectRoot, '1.0.x-dev');
+    ->withOverrides([
+        'require' => ['acme/example-bundle' => '1.0.x-dev'],
+        'repositories' => [[
+            'type' => 'path',
+            'url' => $projectRoot,
+            'options' => ['symlink' => true, 'versions' => ['acme/example-bundle' => '1.0.x-dev']],
+        ]],
+    ]);
 $recipe = InstallationRecipe::create($composer)
     ->withFixtureFile(__DIR__.'/Fixtures/inspection.yaml');
 

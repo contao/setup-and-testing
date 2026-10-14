@@ -12,8 +12,10 @@ declare(strict_types=1);
 
 namespace Contao\E2eTesting\Composer;
 
+use Composer\Json\JsonFile;
 use Contao\E2eTesting\Exception\E2eTestException;
 use Contao\InstallationRecipe\Composer\ComposerConfig;
+use Contao\InstallationRecipe\Composer\PathRepositoryPaths;
 use Symfony\Component\Filesystem\Path;
 
 final readonly class MonorepoProject
@@ -34,6 +36,14 @@ final readonly class MonorepoProject
 
     public function configureComposer(ComposerConfig $composer, string ...$packageDirectories): ComposerConfig
     {
+        if ([] === $packageDirectories) {
+            return $composer;
+        }
+
+        $config = $composer->toArray($this->directory);
+        $repositories = (new PathRepositoryPaths())->resolve($config['repositories'] ?? [], $this->directory);
+        $requirements = [];
+
         foreach ($packageDirectories as $packageDirectory) {
             $path = Path::join($this->directory, $packageDirectory);
             $package = self::readComposerFile(Path::join($path, 'composer.json'));
@@ -43,10 +53,18 @@ final readonly class MonorepoProject
                 throw new E2eTestException(\sprintf('The Composer package in "%s" has no name.', $path));
             }
 
-            $composer = $composer->withPathPackage($name, $path, $this->version);
+            $requirements[$name] = $this->version;
+            $repositories[] = [
+                'type' => 'path',
+                'url' => $path,
+                'options' => ['symlink' => true, 'versions' => [$name => $this->version]],
+            ];
         }
 
-        return $composer;
+        return $composer->withOverrides([
+            'require' => $requirements,
+            'repositories' => $repositories,
+        ]);
     }
 
     /**
@@ -80,8 +98,8 @@ final readonly class MonorepoProject
         }
 
         try {
-            $composer = json_decode((string) file_get_contents($path), true, 512, JSON_THROW_ON_ERROR);
-        } catch (\JsonException $exception) {
+            $composer = (new JsonFile($path))->read();
+        } catch (\Exception $exception) {
             throw new E2eTestException(\sprintf('The Composer file "%s" is invalid.', $path), 0, $exception);
         }
 

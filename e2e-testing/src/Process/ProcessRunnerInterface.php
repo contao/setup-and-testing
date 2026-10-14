@@ -15,8 +15,8 @@ namespace Contao\E2eTesting\Process;
 interface ProcessRunnerInterface
 {
     /**
-     * @param list<string>          $command
-     * @param array<string, string> $environment
+     * @param list<string>                $command
+     * @param array<string, string|false> $environment
      */
     public function run(array $command, string $directory, array $environment = []): string;
 }
