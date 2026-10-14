@@ -226,6 +226,11 @@ final class FingerprintCalculatorTest extends TestCase
             $this->assertSame($firstCommit, $runner->run(['git', 'rev-parse', 'HEAD'], $directory.'/source'));
             $this->assertNotSame($first, $second);
         } finally {
+            // Git pack files can be read-only on Windows.
+            if ('\\' === \DIRECTORY_SEPARATOR && is_dir($directory.'/source/.git')) {
+                $filesystem->chmod($directory.'/source/.git', 0o700, recursive: true);
+            }
+
             $filesystem->remove($directory);
         }
     }

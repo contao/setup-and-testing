@@ -125,6 +125,7 @@ jobs:
             - name: Install the selected PHPUnit and Symfony versions
               run: >-
                   composer update
+                  composer/composer
                   playwright-php/playwright
                   phpunit/phpunit
                   symfony/browser-kit
