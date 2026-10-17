@@ -23,11 +23,13 @@ final class DockerDatabaseLeaseRegistry
 
     /**
      * @param \Closure(): DockerDatabaseLease $factory
+     *
+     * @return bool Whether this call acquired a new process lease
      */
-    public function acquire(string $key, \Closure $factory): void
+    public function acquire(string $key, \Closure $factory): bool
     {
         if (isset(self::$leases[$key])) {
-            return;
+            return false;
         }
 
         self::$leases[$key] = $factory();
@@ -36,6 +38,8 @@ final class DockerDatabaseLeaseRegistry
             register_shutdown_function(self::releaseAll(...));
             self::$shutdownRegistered = true;
         }
+
+        return true;
     }
 
     public function release(string $key): void

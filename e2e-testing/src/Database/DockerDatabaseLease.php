@@ -35,7 +35,8 @@ final class DockerDatabaseLease
 
     public static function acquire(string $lockPath, \Closure $stop): self
     {
-        $lock = fopen($lockPath, 'c+');
+        // Child processes must not keep this lease alive after the runner exits.
+        $lock = fopen($lockPath, 'c+e');
 
         if (false === $lock) {
             throw new E2eTestException(\sprintf('Could not open the Docker database lease "%s".', $lockPath));

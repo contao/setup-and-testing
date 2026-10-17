@@ -30,7 +30,7 @@ final class DockerDatabaseExclusiveLock
 
     public static function acquire(string $lockPath): self|null
     {
-        $lock = fopen($lockPath, 'c+');
+        $lock = fopen($lockPath, 'c+e');
 
         if (false === $lock) {
             throw new E2eTestException(\sprintf('Could not open the Docker database lease "%s".', $lockPath));

@@ -25,6 +25,18 @@ final class WebServerProcess
         private readonly string|null $routerFile = null,
     ) {
         $this->baseUri = 'http://127.0.0.1:'.$port;
+        $reference = \WeakReference::create($this);
+
+        // Stop retained servers before PHP starts destroying application state.
+        register_shutdown_function(
+            static function () use ($reference): void {
+                try {
+                    $reference->get()?->stop();
+                } catch (\Throwable $exception) {
+                    error_log('Could not stop a Contao E2E web server: '.$exception->getMessage());
+                }
+            },
+        );
     }
 
     public function __destruct()

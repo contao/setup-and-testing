@@ -32,10 +32,7 @@ final readonly class DockerDatabaseServer
 
     public function provide(CacheConfig $cache, DockerDatabaseConfig $database): DatabaseServerConfig
     {
-        $config = $this->startContainer($cache, $database);
-        $this->readinessProbe->wait($config);
-
-        return $config;
+        return $this->startContainer($cache, $database, waitForReadiness: true);
     }
 
     public function warmUp(CacheConfig $cache, DockerDatabaseConfig ...$databases): void
@@ -63,16 +60,44 @@ final readonly class DockerDatabaseServer
         }
     }
 
-    private function startContainer(CacheConfig $cache, DockerDatabaseConfig $database): DatabaseServerConfig
+    private function startContainer(CacheConfig $cache, DockerDatabaseConfig $database, bool $waitForReadiness = false): DatabaseServerConfig
     {
         $container = $this->containerName($cache, $database);
         $leasePath = $this->leasePath($cache, $container);
-        $this->leaseRegistry->acquire(
+        $acquired = $this->leaseRegistry->acquire(
             $leasePath,
             fn () => DockerDatabaseLease::acquire($leasePath, fn () => $this->docker->stop($container)),
         );
 
-        $lock = fopen(Path::join($cache->rootDirectory, 'locks/database-server.lock'), 'c+');
+        try {
+            $config = $this->startLocked($cache, $database);
+
+            if ($waitForReadiness) {
+                $this->readinessProbe->wait($config);
+            }
+
+            return $config;
+        } catch (\Throwable $exception) {
+            if ($acquired) {
+                $this->releaseAfterFailure($leasePath);
+            }
+
+            throw $exception;
+        }
+    }
+
+    private function releaseAfterFailure(string $leasePath): void
+    {
+        try {
+            $this->leaseRegistry->release($leasePath);
+        } catch (\Throwable $exception) {
+            error_log('Could not stop a Contao E2E Docker database after startup failed: '.$exception->getMessage());
+        }
+    }
+
+    private function startLocked(CacheConfig $cache, DockerDatabaseConfig $database): DatabaseServerConfig
+    {
+        $lock = fopen(Path::join($cache->rootDirectory, 'locks/database-server.lock'), 'c+e');
 
         if (false === $lock) {
             throw new DockerUnavailableException('Could not lock the Docker database server setup.');
