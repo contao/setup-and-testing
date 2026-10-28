@@ -17,10 +17,6 @@ use Symfony\Component\Process\Process;
 
 final readonly class DockerClient
 {
-    private const DATABASE_PATH_LABEL = 'org.contao.e2e.database-path';
-
-    private const DATABASE_CONFIG_LABEL = 'org.contao.e2e.database-config';
-
     /**
      * @param non-empty-list<string> $command
      */
@@ -30,12 +26,21 @@ final readonly class DockerClient
 
     public function isRunning(string $container): bool
     {
-        return 'true' === $this->optional(['inspect', '--format', '{{.State.Running}}', $container]);
+        $state = $this->inspect($container);
+
+        return $state && $state->running;
     }
 
     public function exists(string $container): bool
     {
-        return null !== $this->optional(['inspect', '--format', '{{.Id}}', $container]);
+        return null !== $this->inspect($container);
+    }
+
+    public function inspect(string $container): DockerContainerState|null
+    {
+        $json = $this->optional(['inspect', '--format', '{{json .}}', $container]);
+
+        return null === $json ? null : DockerContainerState::fromJson($json);
     }
 
     public function start(string $container): void
@@ -48,8 +53,8 @@ final readonly class DockerClient
         $this->run([
             'run', '--detach', '--name', $container,
             '--env', $config->rootPasswordEnvironment.'=contao-e2e',
-            '--label', self::DATABASE_CONFIG_LABEL.'='.$config->fingerprint(),
-            '--label', self::DATABASE_PATH_LABEL.'='.hash('sha256', $databaseDirectory),
+            '--label', DockerContainerState::DATABASE_CONFIG_LABEL.'='.$config->fingerprint(),
+            '--label', DockerContainerState::DATABASE_PATH_LABEL.'='.hash('sha256', $databaseDirectory),
             '--mount', 'type=bind,source='.$databaseDirectory.',target=/var/lib/mysql',
             '--publish', '127.0.0.1::3306',
             $config->image,
@@ -60,24 +65,12 @@ final readonly class DockerClient
 
     public function usesDatabaseConfiguration(string $container, DockerDatabaseConfig $config, string $databaseDirectory): bool
     {
-        $path = $this->label($container, self::DATABASE_PATH_LABEL);
-        $configuration = $this->label($container, self::DATABASE_CONFIG_LABEL);
-
-        return null !== $path
-            && null !== $configuration
-            && hash_equals(hash('sha256', $databaseDirectory), $path)
-            && hash_equals($config->fingerprint(), $configuration);
+        return $this->inspect($container)?->usesDatabaseConfiguration($config, $databaseDirectory) ?? false;
     }
 
     public function port(string $container): int
     {
-        $port = $this->run(['inspect', '--format', '{{(index (index .NetworkSettings.Ports "3306/tcp") 0).HostPort}}', $container]);
-
-        if (!ctype_digit($port)) {
-            throw new DockerUnavailableException('Docker did not expose a MariaDB port for the Contao E2E container.');
-        }
-
-        return (int) $port;
+        return $this->inspect($container)?->port() ?? throw new DockerUnavailableException('Docker did not expose a MariaDB port for the Contao E2E container.');
     }
 
     public function stop(string $container): void
@@ -104,11 +97,6 @@ final readonly class DockerClient
         $output = $this->run(['ps', '--all', '--filter', 'name='.$name, '--format', '{{.Names}}']);
 
         return '' === $output ? [] : explode("\n", $output);
-    }
-
-    private function label(string $container, string $label): string|null
-    {
-        return $this->optional(['inspect', '--format', '{{index .Config.Labels "'.$label.'"}}', $container]);
     }
 
     /**

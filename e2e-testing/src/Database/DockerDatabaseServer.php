@@ -121,22 +121,28 @@ final readonly class DockerDatabaseServer
         $databaseDirectory = $database->storageDirectory($cache);
         $storageInitialized = $this->isStorageInitialized($cache, $database);
         $this->filesystem->mkdir($databaseDirectory);
+        $state = $this->docker->inspect($container);
 
-        if ($this->docker->exists($container) && (!$storageInitialized || !$this->docker->usesDatabaseConfiguration($container, $database, $databaseDirectory))) {
+        if ($state && (!$storageInitialized || !$state->usesDatabaseConfiguration($database, $databaseDirectory))) {
             $this->docker->remove($container);
+            $state = null;
         }
 
         $this->filesystem->dumpFile($database->storageMarker($cache), $database->fingerprint()."\n");
 
-        if (!$this->docker->isRunning($container)) {
-            if ($this->docker->exists($container)) {
+        if (!$state?->running) {
+            if ($state) {
                 $this->docker->start($container);
             } else {
                 $this->docker->create($container, $database, $databaseDirectory);
             }
+
+            $state = $this->docker->inspect($container);
         }
 
-        return new DatabaseServerConfig(\sprintf('mysql://root:contao-e2e@127.0.0.1:%d', $this->docker->port($container)));
+        $port = $state?->port() ?? throw new DockerUnavailableException('Docker did not expose a MariaDB port for the Contao E2E container.');
+
+        return new DatabaseServerConfig(\sprintf('mysql://root:contao-e2e@127.0.0.1:%d', $port));
     }
 
     private function containerName(CacheConfig $cache, DockerDatabaseConfig $database): string

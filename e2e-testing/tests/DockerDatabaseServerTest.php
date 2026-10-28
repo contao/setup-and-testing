@@ -56,6 +56,92 @@ final class DockerDatabaseServerTest extends TestCase
         }
     }
 
+    public function testRunningContainerReuseNeedsOnlyOneInspection(): void
+    {
+        $project = sys_get_temp_dir().'/docker-reuse-'.bin2hex(random_bytes(6));
+        $cache = CacheConfig::forProject($project);
+        $filesystem = new Filesystem();
+        $filesystem->mkdir($project);
+
+        $command = $project.'/docker.php';
+        $log = $project.'/docker.log';
+        $filesystem->dumpFile($command, $this->dockerCommand($log));
+        $server = new DockerDatabaseServer(new DockerClient([PHP_BINARY, $command]));
+
+        try {
+            $server->warmUp($cache, DockerDatabaseConfig::mariaDb());
+            $filesystem->dumpFile($log, '');
+            $server->warmUp($cache, DockerDatabaseConfig::mariaDb());
+            $lines = file($log, FILE_IGNORE_NEW_LINES);
+            $this->assertNotFalse($lines);
+            $commands = array_map(json_decode(...), $lines);
+
+            $this->assertSame([['inspect', '--format', '{{json .}}', 'contao-e2e-'.substr(hash('sha256', $cache->projectDirectory), 0, 12)]], $commands);
+        } finally {
+            (new DockerDatabaseLeaseRegistry())->release($this->leasePath($cache));
+            $filesystem->remove($project);
+        }
+    }
+
+    public function testStoppedContainerIsStartedAndItsNewStateIsInspected(): void
+    {
+        $project = sys_get_temp_dir().'/docker-restart-'.bin2hex(random_bytes(6));
+        $cache = CacheConfig::forProject($project);
+        $filesystem = new Filesystem();
+        $filesystem->mkdir($project);
+
+        $command = $project.'/docker.php';
+        $log = $project.'/docker.log';
+        $filesystem->dumpFile($command, $this->dockerCommand($log));
+        $docker = new DockerClient([PHP_BINARY, $command]);
+        $server = new DockerDatabaseServer($docker);
+
+        try {
+            $server->warmUp($cache, DockerDatabaseConfig::mariaDb());
+            $docker->stop('contao-e2e-'.substr(hash('sha256', $cache->projectDirectory), 0, 12));
+            $filesystem->dumpFile($log, '');
+            $server->warmUp($cache, DockerDatabaseConfig::mariaDb());
+            $lines = file($log, FILE_IGNORE_NEW_LINES);
+            $this->assertNotFalse($lines);
+            $commands = array_map(static fn ($line) => json_decode($line, true)[0], $lines);
+
+            $this->assertSame(['inspect', 'start', 'inspect'], $commands);
+        } finally {
+            (new DockerDatabaseLeaseRegistry())->release($this->leasePath($cache));
+            $filesystem->remove($project);
+        }
+    }
+
+    public function testMissingStorageMarkerStillRecreatesAnExistingContainer(): void
+    {
+        $project = sys_get_temp_dir().'/docker-stale-'.bin2hex(random_bytes(6));
+        $cache = CacheConfig::forProject($project);
+        $filesystem = new Filesystem();
+        $filesystem->mkdir($project);
+
+        $command = $project.'/docker.php';
+        $log = $project.'/docker.log';
+        $filesystem->dumpFile($command, $this->dockerCommand($log));
+        $server = new DockerDatabaseServer(new DockerClient([PHP_BINARY, $command]));
+        $database = DockerDatabaseConfig::mariaDb();
+
+        try {
+            $server->warmUp($cache, $database);
+            $filesystem->remove($database->storageMarker($cache));
+            $filesystem->dumpFile($log, '');
+            $server->warmUp($cache, $database);
+            $lines = file($log, FILE_IGNORE_NEW_LINES);
+            $this->assertNotFalse($lines);
+            $commands = array_map(static fn ($line) => json_decode($line, true)[0], $lines);
+
+            $this->assertContains('rm', $commands);
+            $this->assertContains('run', $commands);
+        } finally {
+            (new DockerDatabaseLeaseRegistry())->release($this->leasePath($cache));
+            $filesystem->remove($project);
+        }
+    }
+
     public function testReadinessFailureReleasesOwnershipImmediately(): void
     {
         $project = \dirname(__DIR__, 2).'/.contao-e2e/runtime/unit-tests/docker-failure-'.bin2hex(random_bytes(6));
@@ -175,9 +261,11 @@ final class DockerDatabaseServerTest extends TestCase
         $command = $project.'/docker.php';
         $filesystem->dumpFile($command, '<?php $port = '.var_export($readiness ? '1' : 'invalid', true).';'.<<<'PHP'
             if ('stop' === ($argv[1] ?? null)) { fwrite(STDERR, 'stop failed'); exit(1); }
-            if (str_contains(implode(' ', $argv), 'HostPort')) { echo $port; exit; }
-            if (str_contains(implode(' ', $argv), 'State.Running')) { echo 'true'; exit; }
-            if ('inspect' === ($argv[1] ?? null)) { exit(1); }
+            if ('run' === ($argv[1] ?? null)) { touch(__FILE__.'.created'); }
+            if ('inspect' === ($argv[1] ?? null)) {
+                if (!is_file(__FILE__.'.created')) { exit(1); }
+                echo json_encode(['State' => ['Running' => true], 'NetworkSettings' => ['Ports' => ['3306/tcp' => [['HostPort' => $port]]]]]);
+            }
             PHP,
         );
         $errorLog = $project.'/errors.log';
@@ -208,9 +296,33 @@ final class DockerDatabaseServerTest extends TestCase
 
     private function dockerCommand(string $log): string
     {
-        return '<?php file_put_contents('.var_export($log, true).', json_encode(array_slice($argv, 1)).PHP_EOL, FILE_APPEND);'
-            .' if (str_contains(implode(" ", $argv), "HostPort")) { echo "1"; exit(0); }'
-            .' if (($argv[1] ?? null) === "inspect") { exit(1); }';
+        return '<?php $log = '.var_export($log, true).';'.<<<'PHP_WRAP'
+            file_put_contents($log, json_encode(array_slice($argv, 1)).PHP_EOL, FILE_APPEND);
+            $stateFile = $log.'.state';
+            $state = is_file($stateFile) ? json_decode(file_get_contents($stateFile), true) : null;
+            $command = $argv[1] ?? null;
+            if ('inspect' === $command) {
+                if (!$state) { exit(1); }
+                echo json_encode($state);
+                exit;
+            }
+            if ('run' === $command) {
+                $labels = [];
+                foreach ($argv as $i => $argument) {
+                    if ('--label' === $argument) {
+                        [$key, $value] = explode('=', $argv[$i + 1], 2);
+                        $labels[$key] = $value;
+                    }
+                }
+                $state = ['State' => ['Running' => true], 'Config' => ['Labels' => $labels], 'NetworkSettings' => ['Ports' => ['3306/tcp' => [['HostPort' => '1']]]]];
+            } elseif ('start' === $command || 'stop' === $command) {
+                $state['State']['Running'] = 'start' === $command;
+            } elseif ('rm' === $command) {
+                unlink($stateFile);
+                exit;
+            }
+            file_put_contents($stateFile, json_encode($state));
+            PHP_WRAP;
     }
 
     private function leasePath(CacheConfig $cache): string
