@@ -44,6 +44,15 @@ final readonly class FingerprintCalculator
         return new FingerprintSet($dependency, $application, $data);
     }
 
+    public function configurationFingerprint(ManagedEditionConfig $config): string
+    {
+        return $this->hash([
+            $config->appEnvironment,
+            $config->environmentVariables(),
+            $config->recipe->assets,
+        ]);
+    }
+
     /**
      * @param array<string, string> $sources
      */

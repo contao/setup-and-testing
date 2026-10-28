@@ -31,27 +31,55 @@ final class FingerprintCalculatorTest extends TestCase
         $directory = $this->createInputDirectory();
         $calculator = new FingerprintCalculator(new SourceFingerprint());
         $initial = $calculator->calculate($this->config($directory));
+        $configuration = $calculator->configurationFingerprint($this->config($directory));
 
         (new Filesystem())->dumpFile($directory.'/fixture.yaml', "example:\n  - id: 2\n");
         $fixtureChanged = $calculator->calculate($this->config($directory));
         $this->assertSame($initial->dependency, $fixtureChanged->dependency);
         $this->assertSame($initial->application, $fixtureChanged->application);
         $this->assertNotSame($initial->data, $fixtureChanged->data);
+        $this->assertSame($configuration, $calculator->configurationFingerprint($this->config($directory)));
 
         (new Filesystem())->dumpFile($directory.'/config.yaml', "contao:\n  csrf_cookie_prefix: changed\n");
         $configChanged = $calculator->calculate($this->config($directory));
         $this->assertSame($initial->dependency, $configChanged->dependency);
         $this->assertNotSame($initial->application, $configChanged->application);
+        $this->assertSame($configuration, $calculator->configurationFingerprint($this->config($directory)));
 
         (new Filesystem())->dumpFile($directory.'/tl_content.php', '<?php $GLOBALS["TL_DCA"]["tl_content"]["fields"]["example"]["eval"]["mandatory"] = true;');
         $dcaChanged = $calculator->calculate($this->config($directory));
         $this->assertSame($configChanged->dependency, $dcaChanged->dependency);
         $this->assertNotSame($configChanged->application, $dcaChanged->application);
+        $this->assertSame($configuration, $calculator->configurationFingerprint($this->config($directory)));
 
         (new Filesystem())->dumpFile($directory.'/source/Example.php', '<?php return 2;');
         $sourceChanged = $calculator->calculate($this->config($directory));
         $this->assertSame($dcaChanged->dependency, $sourceChanged->dependency);
         $this->assertNotSame($dcaChanged->application, $sourceChanged->application);
+        $this->assertSame($configuration, $calculator->configurationFingerprint($this->config($directory)));
+    }
+
+    public function testConfigurationFingerprintSeparatesApplicationVariantsButNotFixtureSets(): void
+    {
+        $directory = $this->createInputDirectory();
+        $calculator = new FingerprintCalculator(new SourceFingerprint());
+        $config = $this->config($directory);
+        $configuration = $calculator->configurationFingerprint($config);
+
+        try {
+            $this->assertNotSame($configuration, $calculator->configurationFingerprint($config->withAppEnvironment('dev')));
+            $this->assertNotSame($configuration, $calculator->configurationFingerprint($config->withEnvironmentVariables(['FEATURE' => 'enabled'])));
+            $this->assertNotSame($configuration, $calculator->configurationFingerprint($config->withSimulatedOrigins()));
+            (new Filesystem())->dumpFile($directory.'/another-config.yaml', "contao: {}\n");
+            $recipe = $config->recipe->withConfigFile($directory.'/another-config.yaml');
+            $this->assertNotSame($configuration, $calculator->configurationFingerprint(ManagedEditionConfig::create($recipe, $directory)));
+            $recipe = InstallationRecipe::create($config->recipe->composer)->withFixtureFile($directory.'/fixture.yaml');
+            $this->assertNotSame($configuration, $calculator->configurationFingerprint(ManagedEditionConfig::create($recipe, $directory)));
+            $recipe = $config->recipe->withFixtureFile($directory.'/fixture.yaml');
+            $this->assertSame($configuration, $calculator->configurationFingerprint(ManagedEditionConfig::create($recipe, $directory)));
+        } finally {
+            (new Filesystem())->remove($directory);
+        }
     }
 
     #[DataProvider('provideRepositoriesThatMayBeCopied')]

@@ -52,7 +52,7 @@ final readonly class ManagedEditionFactory
             $dependencyFingerprint = hash('sha256', $dependencyFingerprint.random_bytes(16));
         }
 
-        $lease = $this->installationPool->acquire($cache, $dependencyFingerprint);
+        $lease = $this->installationPool->acquire($cache, $dependencyFingerprint, $this->fingerprintCalculator->configurationFingerprint($config));
         $databaseName = 'contao_e2e_'.substr($dependencyFingerprint, 0, 16).'_'.$lease->slot;
         $database = $this->createDatabase($databaseServer, $databaseName);
         $installation = new PreparedInstallation($lease, $database, $fingerprints);

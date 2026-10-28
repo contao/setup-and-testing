@@ -12,13 +12,17 @@ declare(strict_types=1);
 
 namespace Contao\E2eTesting\Tests;
 
+use Contao\E2eTesting\Cache\FingerprintCalculator;
 use Contao\E2eTesting\Cache\FingerprintSet;
+use Contao\E2eTesting\Cache\SourceFingerprint;
+use Contao\E2eTesting\Cache\WorkspaceInitializer;
 use Contao\E2eTesting\Composer\ComposerInstaller;
 use Contao\E2eTesting\Database\InstallationDatabaseInterface;
 use Contao\E2eTesting\Exception\ProcessFailedException;
 use Contao\E2eTesting\Installation\ApplicationPreparer;
 use Contao\E2eTesting\Installation\InstallationBuilder;
 use Contao\E2eTesting\Installation\InstallationManifest;
+use Contao\E2eTesting\Installation\InstallationPool;
 use Contao\E2eTesting\Installation\InstallationWorkspace;
 use Contao\E2eTesting\ManagedEdition\ManagedEditionConfig;
 use Contao\E2eTesting\Process\ContaoConsole;
@@ -126,6 +130,49 @@ final class InstallationBuilderTest extends TestCase
         $this->assertSame('cached dependencies', file_get_contents($installation->directory.'/vendor/installed.txt'));
         $this->assertSame('cached application', file_get_contents($installation->directory.'/templates/new.txt'));
         $this->assertManifest($installation);
+    }
+
+    public function testSwitchingApplicationVariantsKeepsTheirPreparedInstallations(): void
+    {
+        $filesystem = new Filesystem();
+        $filesystem->dumpFile($this->directory.'/variant.yaml', "contao:\n  csrf_cookie_prefix: variant\n");
+
+        $variant = ManagedEditionConfig::create($this->config->recipe->withConfigFile($this->directory.'/variant.yaml'), $this->directory);
+        $cache = $this->config->environment->cache;
+        (new WorkspaceInitializer())->initialize($cache);
+        $pool = new InstallationPool();
+        $calculator = new FingerprintCalculator(new SourceFingerprint());
+        $builder = $this->builder();
+        $directories = [];
+
+        foreach ([$this->config, $variant, $this->config, $this->config] as $index => $config) {
+            if (3 === $index) {
+                $filesystem->dumpFile($this->directory.'/new.txt', 'updated recipe content');
+            }
+
+            $fingerprints = $calculator->calculate($config);
+            $lease = $pool->acquire($cache, $fingerprints->dependency, $calculator->configurationFingerprint($config));
+
+            try {
+                $this->commands = [];
+                $installation = new InstallationWorkspace($lease->directory.'/project', $fingerprints);
+                $builder->prepare($config, $installation, $this->database());
+                $directories[] = $lease->directory;
+                $expected = match ($index) {
+                    0, 1 => ['composer', 'autoload', 'setup', 'help', 'migrate'],
+                    2 => [],
+                    3 => ['autoload', 'setup', 'help', 'migrate'],
+                };
+                $this->assertSame($expected, $this->commands);
+            } finally {
+                $lease->release();
+            }
+        }
+
+        $this->assertNotSame($directories[0], $directories[1]);
+        $this->assertSame($directories[0], $directories[2]);
+        $this->assertSame($directories[0], $directories[3]);
+        $this->assertSame('updated recipe content', file_get_contents($directories[3].'/project/templates/new.txt'));
     }
 
     public function testCachedInstallationWithoutSchemaMigratesWithoutRebuildingFiles(): void
