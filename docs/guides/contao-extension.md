@@ -10,8 +10,10 @@ You need [the supported PHP and Node.js versions](../reference/requirements.md),
 
 ```shell
 composer require --dev contao/e2e-testing:dev-main contao/installation-recipe:dev-main
-vendor/bin/playwright-install --browsers
+vendor/bin/playwright-install firefox
 ```
+
+This installs Firefox, the default browser. See [browser installation](../testing/browsers.md) to select additional browsers.
 
 Ignore `.contao-e2e/` in your bundle's `.gitignore`. It contains cached installations, Docker database files and runtime data.
 

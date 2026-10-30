@@ -18,8 +18,10 @@ Run from the repository where you want to keep the tests. This can be your appli
 
 ```shell
 composer require --dev contao/e2e-testing:dev-main contao/installation-recipe:dev-main
-vendor/bin/playwright-install --browsers
+vendor/bin/playwright-install firefox
 ```
+
+This installs Firefox, the default browser. See [browser installation](../testing/browsers.md) to select additional browsers.
 
 Add `.contao-e2e/` to that repository's `.gitignore`. It contains test caches and traces.
 

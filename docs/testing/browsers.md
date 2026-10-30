@@ -1,12 +1,21 @@
 # Browsers and assertions
 
-Install the Playwright browser binaries once after requiring the package:
+Install Firefox, the default browser, after requiring the package:
 
 ```shell
-vendor/bin/playwright-install --browsers
+vendor/bin/playwright-install firefox
 ```
 
-Use `vendor/bin/playwright-install --with-deps --browsers` on a fresh Linux CI runner to install the required system libraries as well. Playwright caches matching Chromium, Firefox, and WebKit binaries outside the project and reuses them between runs.
+Use `vendor/bin/playwright-install --with-deps firefox` on a fresh Linux CI runner to install the required system libraries as well. Playwright caches matching browser binaries outside the project and reuses them between runs.
+
+Install only the browsers your tests use. Pass multiple browser names if your suite needs more than one:
+
+```shell
+vendor/bin/playwright-install firefox chromium
+vendor/bin/playwright-install --with-deps firefox chromium
+```
+
+The available browser names are `firefox`, `chromium`, and `webkit`. Explicit names replace `--browsers`, which installs all three. Keep installation as an explicit setup step before running tests.
 
 ## Create a browser
 

@@ -6,9 +6,11 @@ Run commands from the consumer project root. Composer generates Windows proxies 
 
 ```powershell
 composer require --dev contao/e2e-testing:dev-main contao/installation-recipe:dev-main
-vendor/bin/playwright-install --browsers
+vendor/bin/playwright-install firefox
 vendor/bin/phpunit --testsuite=e2e
 ```
+
+This installs Firefox, the default browser. See [browser installation](../testing/browsers.md) to select additional browsers.
 
 The library invokes PHP, Composer, Git and Docker without relying on a POSIX shell. Make those commands available on `PATH`.
 

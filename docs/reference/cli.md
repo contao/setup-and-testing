@@ -27,7 +27,7 @@ vendor/bin/contao-e2e help cache:metadata
 Browser installation is supplied by the Playwright dependency:
 
 ```shell
-vendor/bin/playwright-install --browsers
+vendor/bin/playwright-install firefox
 ```
 
-Use `--with-deps --browsers` on fresh Linux runners to install system dependencies as well as browser binaries.
+Firefox is the default browser. Pass `chromium` or `webkit` instead, or multiple names such as `firefox chromium`, to match your test suite. Use `--with-deps firefox` on fresh Linux runners to install system dependencies as well as browser binaries. Explicit browser names replace `--browsers`, which installs all three. See [browser installation](../testing/browsers.md).

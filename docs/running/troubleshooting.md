@@ -6,7 +6,7 @@ The first run resolves Composer dependencies, builds Contao and prepares the dat
 
 ## Browser binaries or system libraries are missing
 
-Run `vendor/bin/playwright-install --browsers` after Composer installation. On a fresh Linux runner, use `vendor/bin/playwright-install --with-deps --browsers`. If setting `PLAYWRIGHT_BROWSERS_PATH`, use the same value for installation, cache restoration and tests.
+Run `vendor/bin/playwright-install firefox` after Composer installation for the default browser. On a fresh Linux runner, use `vendor/bin/playwright-install --with-deps firefox`. If your tests use other browsers, pass their names instead or alongside `firefox`. See [browser installation](../testing/browsers.md). If setting `PLAYWRIGHT_BROWSERS_PATH`, use the same value for installation, cache restoration and tests.
 
 ## Docker or the database is unavailable
 
