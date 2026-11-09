@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "62572f0cb531b09a7c374c135f1c82e8",
+    "content-hash": "b096e75892dc04c510bdab2fbe6b4a31",
     "packages": [
         {
             "name": "composer/ca-bundle",
@@ -1626,16 +1626,16 @@
         },
         {
             "name": "playwright-php/playwright",
-            "version": "v1.5.0",
+            "version": "v1.6.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/playwright-php/playwright.git",
-                "reference": "8492788afdb920dcb04ec89bddeb3c4e93d3b5e2"
+                "reference": "9b98992d064a1b549c029acf2f66576e321adb91"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/playwright-php/playwright/zipball/8492788afdb920dcb04ec89bddeb3c4e93d3b5e2",
-                "reference": "8492788afdb920dcb04ec89bddeb3c4e93d3b5e2",
+                "url": "https://api.github.com/repos/playwright-php/playwright/zipball/9b98992d064a1b549c029acf2f66576e321adb91",
+                "reference": "9b98992d064a1b549c029acf2f66576e321adb91",
                 "shasum": ""
             },
             "require": {
@@ -1702,7 +1702,7 @@
             ],
             "support": {
                 "issues": "https://github.com/playwright-php/playwright/issues",
-                "source": "https://github.com/playwright-php/playwright/tree/v1.5.0"
+                "source": "https://github.com/playwright-php/playwright/tree/v1.6.0"
             },
             "funding": [
                 {
@@ -1710,7 +1710,8 @@
                     "type": "github"
                 }
             ],
-            "time": "2026-09-20T12:54:18+00:00"
+            "time": "2026-11-07T23:05:13+00:00",
+            "published-time": "2026-11-07T23:07:15+00:00"
         },
         {
             "name": "psr/cache",

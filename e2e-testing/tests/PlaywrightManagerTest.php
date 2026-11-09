@@ -227,7 +227,7 @@ final class PlaywrightManagerTest extends TestCase
         }
     }
 
-    public function testIdleRecyclingReleasesRetainedContextsAndPages(): void
+    public function testClosedContextsAndPagesAreReleasedBeforeIdleRecycling(): void
     {
         $manager = $this->manager();
 
@@ -239,7 +239,8 @@ final class PlaywrightManagerTest extends TestCase
             unset($session);
             $this->loadContexts($manager, 49);
             gc_collect_cycles();
-            $this->assertNotNull($context->get());
+            $this->assertNull($context->get());
+            $this->assertNull($page->get());
             $this->assertSame(1, $this->launchCount);
             $this->loadContexts($manager, 1);
             gc_collect_cycles();

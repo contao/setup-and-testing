@@ -150,8 +150,8 @@ final class PlaywrightManager implements BrowserSessionFactoryInterface
             }
         }
 
-        // Playwright PHP retains closed contexts and event dispatchers. Recycling the
-        // client when idle bounds that retention without touching active sessions.
+        // Recycling the client when idle periodically releases browser resources without
+        // touching active sessions.
         $this->reset();
     }
 
