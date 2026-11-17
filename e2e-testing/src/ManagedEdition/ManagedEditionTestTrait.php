@@ -13,10 +13,18 @@ declare(strict_types=1);
 namespace Contao\E2eTesting\ManagedEdition;
 
 use Contao\E2eTesting\Application\ApplicationTestTrait;
+use Contao\E2eTesting\Mail\MailAssertionsTrait;
+use Contao\E2eTesting\Mail\Mailbox;
 
 trait ManagedEditionTestTrait
 {
     use ApplicationTestTrait;
+    use MailAssertionsTrait;
+
+    protected function mailbox(): Mailbox
+    {
+        return self::managedEdition()->mailbox();
+    }
 
     abstract protected static function createApplicationConfig(): ManagedEditionConfig;
 

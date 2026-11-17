@@ -57,8 +57,8 @@ The Documentation workflow runs on every pull request and on pushes to `main`, i
 The default test suite runs the database reset integration tests against a temporary SQLite database. To verify a server-backed database locally, supply a dedicated, empty database that the test user may create and drop tables in:
 
 ```shell
-CONTAO_E2E_RESET_DATABASE_URL='mysql://root:password@127.0.0.1:3306/reset_test' vendor/bin/phpunit e2e-testing/tests/DatabaseResetterTest.php
-CONTAO_E2E_RESET_DATABASE_URL='postgres://test:password@127.0.0.1:5432/reset_test' vendor/bin/phpunit e2e-testing/tests/DatabaseResetterTest.php
+CONTAO_E2E_RESET_DATABASE_URL='mysql://root:password@127.0.0.1:3306/reset_test' composer test
+CONTAO_E2E_RESET_DATABASE_URL='postgres://test:password@127.0.0.1:5432/reset_test' composer test
 ```
 
-Use the MySQL URL form for MariaDB as well. A configured connection failure fails the suite. Engine-specific tests skip on other engines. CI supplies each documented database version and tests DBAL 3.x and 4.x separately.
+Use the MySQL URL form for MariaDB as well. A configured connection failure fails the suite. Engine-specific tests skip on other engines. The shared CI PHPUnit matrix runs the full suite for each documented database version with DBAL 3.x and 4.x. Linux jobs also enable the [mail capture integration tests](testing/mail.md#run-the-smtp-integration-tests).

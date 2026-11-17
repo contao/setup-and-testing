@@ -27,6 +27,7 @@ use Contao\E2eTesting\Database\DatabaseManager;
 use Contao\E2eTesting\Database\DatabaseResetMode;
 use Contao\E2eTesting\Http\ServerManager;
 use Contao\E2eTesting\Http\ServerProcess;
+use Contao\E2eTesting\Mail\Mailbox;
 use Contao\InstallationRecipe\Fixture\FixtureResult;
 use Contao\InstallationRecipe\Fixture\FixtureSet;
 use Symfony\Component\Filesystem\Filesystem;
@@ -66,6 +67,17 @@ final class ManagedEdition implements ApplicationInterface
     public function directory(): string
     {
         return $this->state->installation->directory();
+    }
+
+    public function mailbox(): Mailbox
+    {
+        $connection = $this->state->config->mailCaptureConnection();
+
+        if (!$connection) {
+            throw new \LogicException('Enable mail capture with ManagedEditionConfig::withMailCapture() before accessing the mailbox.');
+        }
+
+        return new Mailbox($connection);
     }
 
     public function database(): DatabaseManager

@@ -8,6 +8,7 @@ Set environment variables before running PHPUnit or the CLI. See [Windows setup]
 | `CONTAO_E2E_DATABASE_URL` | Unset | Administrative database server URL, overriding Docker provisioning |
 | `CONTAO_E2E_DATABASE_TYPE` | `mariadb` | Docker database type, `mariadb` or `mysql` |
 | `CONTAO_E2E_DATABASE_IMAGE` | `mariadb:11.4` or `mysql:8.4`, depending on type | Docker image used for that database type |
+| `CONTAO_E2E_MAIL_CAPTURE_IMAGE` | `axllent/mailpit:latest` | Docker image for [mail capture](../testing/mail.md), overridden by an explicit `DockerMailCaptureConfig` image |
 | `CONTAO_E2E_NO_CACHE` | Unset | Set to `1` to force a fresh Managed Edition dependency installation |
 | `CONTAO_E2E_TRACE` | Unset | `on-failure` or `always`, see [traces](../running/traces.md) |
 | `PLAYWRIGHT_BROWSERS_PATH` | Playwright's platform cache | Browser installation and lookup directory, also used by [CI cache metadata](../running/ci.md) |

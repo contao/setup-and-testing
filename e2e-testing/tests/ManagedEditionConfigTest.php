@@ -14,9 +14,13 @@ namespace Contao\E2eTesting\Tests;
 
 use Contao\E2eTesting\Cache\CacheConfig;
 use Contao\E2eTesting\Database\DatabaseResetMode;
+use Contao\E2eTesting\Database\DatabaseServerConfig;
 use Contao\E2eTesting\Database\DockerDatabaseConfig;
 use Contao\E2eTesting\Database\DockerDatabaseService;
 use Contao\E2eTesting\Installation\ApplicationPreparer;
+use Contao\E2eTesting\Mail\DockerMailCaptureConfig;
+use Contao\E2eTesting\Mail\DockerMailCaptureService;
+use Contao\E2eTesting\Mail\MailCaptureConfig;
 use Contao\E2eTesting\ManagedEdition\ManagedEditionConfig;
 use Contao\InstallationRecipe\Composer\ComposerConfig;
 use Contao\InstallationRecipe\Recipe\InstallationRecipe;
@@ -26,6 +30,42 @@ use Symfony\Component\Yaml\Yaml;
 
 final class ManagedEditionConfigTest extends TestCase
 {
+    public function testMailCaptureIsOptInAndSurvivesConfigurationChanges(): void
+    {
+        $recipe = InstallationRecipe::create(ComposerConfig::managedEdition('^5.7'));
+        $base = ManagedEditionConfig::create($recipe, \dirname(__DIR__, 2));
+        $enabled = $base->withMailCapture()
+            ->withEnvironmentVariables(['APP_SECRET' => 'secret'])
+            ->withAppEnvironment('dev')
+            ->withResetMode(DatabaseResetMode::RECREATE_SCHEMA)
+            ->withSimulatedOrigins()
+            ->withDatabase(new DatabaseServerConfig('mysql://root:password@localhost'))
+        ;
+
+        $this->assertNull($base->mailCapture());
+        $this->assertInstanceOf(DockerMailCaptureConfig::class, $enabled->mailCapture());
+        $this->assertCount(1, $enabled->dockerServices());
+        $this->assertInstanceOf(DockerMailCaptureService::class, $enabled->dockerServices()[0]);
+        $this->assertSame([], $enabled->withMailCapture(null)->dockerServices());
+    }
+
+    public function testCanUseExternalMailCaptureWithoutDocker(): void
+    {
+        $recipe = InstallationRecipe::create(ComposerConfig::managedEdition('^5.7'));
+        $mailCapture = new MailCaptureConfig('http://localhost:8025', 'smtp://localhost:1025');
+        $config = ManagedEditionConfig::create($recipe, \dirname(__DIR__, 2))
+            ->withDatabase(new DatabaseServerConfig('mysql://root:password@localhost'))
+            ->withMailCapture($mailCapture)
+        ;
+
+        $config = $config->withEnvironmentVariables(['MAILER_DSN' => 'null://null', 'APP_SECRET' => 'secret']);
+
+        $this->assertSame(['MAILER_DSN' => $mailCapture->mailerDsn, 'APP_SECRET' => 'secret'], $config->environmentVariables());
+        $this->assertSame(['MAILER_DSN' => 'null://null', 'APP_SECRET' => 'secret'], $config->withMailCapture(null)->environmentVariables());
+        $this->assertSame($mailCapture, $config->mailCaptureConnection());
+        $this->assertSame([], $config->dockerServices());
+    }
+
     public function testLeavesTheDatabaseUnconfiguredForTheDockerFallback(): void
     {
         $databaseUrl = getenv('CONTAO_E2E_DATABASE_URL');

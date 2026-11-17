@@ -55,9 +55,6 @@ jobs:
                   composer validate --strict installation-recipe/composer.json
                   vendor-bin/monorepo-tools/vendor/bin/monorepo-tools composer-json --validate
 
-            - name: Run the tests
-              run: composer test
-
             - name: Run PHPStan
               run: composer phpstan
 
@@ -68,84 +65,15 @@ jobs:
               run: vendor-bin/ecs/vendor/bin/ecs check --no-progress-bar
 
     phpunit:
-        name: PHPUnit ${{ matrix.phpunit }}, Symfony ${{ matrix.symfony }} on PHP ${{ matrix.php }} (${{ matrix.os }})
+        name: PHPUnit ${{ matrix.phpunit }}, Symfony ${{ matrix.symfony }}, DBAL ${{ matrix.dbal }}, ${{ matrix.database }} on PHP ${{ matrix.php }} (${{ matrix.os }})
         runs-on: ${{ matrix.os }}
         strategy:
             fail-fast: false
             matrix:
-                include:
-                    - os: ubuntu-latest
-                      php: '8.2'
-                      phpunit: '10.5'
-                      symfony: '6.4'
-                    - os: ubuntu-latest
-                      php: '8.4'
-                      phpunit: '13.0'
-                      symfony: '8.0'
-                    - os: windows-latest
-                      php: '8.4'
-                      phpunit: '13.0'
-                      symfony: '8.0'
-        steps:
-            - name: Set up PHP
-              uses: shivammathur/setup-php@v2
-              with:
-                  php-version: ${{ matrix.php }}
-                  extensions: dom, intl, mbstring, opcache, pdo_mysql, pdo_sqlite, zip
-                  coverage: none
-
-            - name: Checkout
-              uses: actions/checkout@v6
-              with:
-                  show-progress: false
-                  persist-credentials: false
-
-            - name: Configure the PHPUnit and Symfony constraints
-              shell: php {0}
-              run: |
-                  <?php
-
-                  $composer = json_decode(file_get_contents('composer.json'), true, flags: JSON_THROW_ON_ERROR);
-                  $composer['require']['phpunit/phpunit'] = '^${{ matrix.phpunit }}';
-
-                  foreach ([
-                      'symfony/browser-kit',
-                      'symfony/console',
-                      'symfony/dom-crawler',
-                      'symfony/filesystem',
-                      'symfony/http-client',
-                      'symfony/process',
-                      'symfony/yaml',
-                  ] as $package) {
-                      $composer['require'][$package] = '^${{ matrix.symfony }}';
-                  }
-
-                  file_put_contents('composer.json', json_encode($composer, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR)."\n");
-
-            - name: Install the selected PHPUnit and Symfony versions
-              run: >-
-                  composer update
-                  composer/composer
-                  playwright-php/playwright
-                  phpunit/phpunit
-                  symfony/browser-kit
-                  symfony/console
-                  symfony/dom-crawler
-                  symfony/filesystem
-                  symfony/http-client
-                  symfony/process
-                  symfony/yaml
-                  --with-all-dependencies --no-interaction --no-progress
-
-            - name: Run the tests
-              run: composer test
-
-    database-reset:
-        name: Database reset (${{ matrix.database }}, DBAL ${{ matrix.dbal }})
-        runs-on: ubuntu-latest
-        strategy:
-            fail-fast: false
-            matrix:
+                os: [ubuntu-latest]
+                php: ['8.4']
+                phpunit: ['13.0']
+                symfony: ['8.0']
                 database: [mysql-8.0, mysql-8.4, mariadb-10.11, mariadb-11.4, postgres-16, postgres-18, sqlite]
                 dbal: ['3.6', '4.0']
                 include:
@@ -184,6 +112,26 @@ jobs:
                       url: ''
                       port: ''
                       health: 'true'
+                    - os: ubuntu-latest
+                      php: '8.2'
+                      phpunit: '10.5'
+                      symfony: '6.4'
+                      database: sqlite
+                      dbal: '3.6'
+                      image: ''
+                      url: ''
+                      port: ''
+                      health: 'true'
+                    - os: windows-latest
+                      php: '8.4'
+                      phpunit: '13.0'
+                      symfony: '8.0'
+                      database: sqlite
+                      dbal: '4.0'
+                      image: ''
+                      url: ''
+                      port: ''
+                      health: 'true'
         services:
             database:
                 image: ${{ matrix.image }}
@@ -207,24 +155,60 @@ jobs:
             - name: Set up PHP
               uses: shivammathur/setup-php@v2
               with:
-                  php-version: '8.4'
-                  extensions: dom, intl, mbstring, pdo_mysql, pdo_pgsql, pdo_sqlite, zip
+                  php-version: ${{ matrix.php }}
+                  extensions: dom, intl, mbstring, opcache, pdo_mysql, pdo_pgsql, pdo_sqlite, zip
                   coverage: none
 
             - name: Checkout
               uses: actions/checkout@v6
               with:
+                  show-progress: false
                   persist-credentials: false
 
-            - name: Select the DBAL version
+            - name: Configure the dependency constraints
+              shell: php {0}
               run: |
-                  composer require 'doctrine/dbal:^${{ matrix.dbal }}' --no-update --no-interaction
-                  composer update doctrine/dbal --with-all-dependencies --no-interaction --no-progress
+                  <?php
 
-            - name: Test database resets
+                  $composer = json_decode(file_get_contents('composer.json'), true, flags: JSON_THROW_ON_ERROR);
+                  $composer['require']['phpunit/phpunit'] = '^${{ matrix.phpunit }}';
+                  $composer['require']['doctrine/dbal'] = '^${{ matrix.dbal }}';
+
+                  foreach ([
+                      'symfony/browser-kit',
+                      'symfony/console',
+                      'symfony/dom-crawler',
+                      'symfony/filesystem',
+                      'symfony/http-client',
+                      'symfony/process',
+                      'symfony/yaml',
+                  ] as $package) {
+                      $composer['require'][$package] = '^${{ matrix.symfony }}';
+                  }
+
+                  file_put_contents('composer.json', json_encode($composer, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR)."\n");
+
+            - name: Install the selected dependency versions
+              run: >-
+                  composer update
+                  composer/composer
+                  doctrine/dbal
+                  playwright-php/playwright
+                  phpunit/phpunit
+                  symfony/browser-kit
+                  symfony/console
+                  symfony/dom-crawler
+                  symfony/filesystem
+                  symfony/http-client
+                  symfony/process
+                  symfony/yaml
+                  --with-all-dependencies --no-interaction --no-progress
+
+            - name: Run the tests
               env:
                   CONTAO_E2E_RESET_DATABASE_URL: ${{ matrix.url && format('{0}:{1}/reset_test', matrix.url, job.services.database.ports[matrix.port]) || '' }}
-              run: vendor/bin/phpunit e2e-testing/tests/DatabaseResetterTest.php e2e-testing/tests/DatabaseResetterFailureTest.php
+                  CONTAO_E2E_TEST_MAIL_CAPTURE: ${{ runner.os == 'Linux' && '1' || '0' }}
+              run: composer test
 
     yamllint:
         name: YAMLlint
