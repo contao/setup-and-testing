@@ -12,6 +12,8 @@ declare(strict_types=1);
 
 namespace Contao\E2eTesting\Mail;
 
+use Contao\E2eTesting\Exception\MailCaptureException;
+
 final readonly class MailCaptureConfig
 {
     public function __construct(
@@ -25,5 +27,28 @@ final readonly class MailCaptureConfig
         if ('smtp' !== parse_url($mailerDsn, PHP_URL_SCHEME) || !parse_url($mailerDsn, PHP_URL_HOST)) {
             throw new \InvalidArgumentException('The mail capture mailer DSN must be an SMTP URL.');
         }
+    }
+
+    public static function fromEnvironment(): self
+    {
+        return self::tryFromEnvironment() ?? throw new MailCaptureException('Set CONTAO_E2E_MAIL_CAPTURE_API_URL and CONTAO_E2E_MAIL_CAPTURE_SMTP_DSN to use an external mail catcher.');
+    }
+
+    public static function tryFromEnvironment(): self|null
+    {
+        $apiUrl = getenv('CONTAO_E2E_MAIL_CAPTURE_API_URL');
+        $mailerDsn = getenv('CONTAO_E2E_MAIL_CAPTURE_SMTP_DSN');
+        $hasApiUrl = false !== $apiUrl && '' !== $apiUrl;
+        $hasMailerDsn = false !== $mailerDsn && '' !== $mailerDsn;
+
+        if (!$hasApiUrl && !$hasMailerDsn) {
+            return null;
+        }
+
+        if (!$hasApiUrl || !$hasMailerDsn) {
+            throw new MailCaptureException('Set both CONTAO_E2E_MAIL_CAPTURE_API_URL and CONTAO_E2E_MAIL_CAPTURE_SMTP_DSN to use an external mail catcher.');
+        }
+
+        return new self($apiUrl, $mailerDsn);
     }
 }

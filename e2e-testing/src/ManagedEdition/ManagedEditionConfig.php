@@ -145,7 +145,10 @@ final class ManagedEditionConfig implements ApplicationConfigInterface
     public function withMailCapture(DockerMailCaptureConfig|MailCaptureConfig|null $mailCapture = new DockerMailCaptureConfig()): self
     {
         $clone = clone $this;
-        $clone->mailCapture = $mailCapture;
+        // Explicit configurations, including null to disable capture, bypass the environment
+        $clone->mailCapture = 0 === \func_num_args()
+            ? MailCaptureConfig::tryFromEnvironment() ?? $mailCapture
+            : $mailCapture;
 
         return $clone;
     }

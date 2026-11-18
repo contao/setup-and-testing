@@ -19,6 +19,18 @@ Mailpit uses dynamically assigned SMTP and HTTP ports bound to `127.0.0.1`. Each
 
 Mail capture participates in the existing [Docker warm-up](databases.md) mechanism. Disable it with `withMailCapture(null)`.
 
+## Use an existing mail catcher
+
+Keep the same `withMailCapture()` call in your tests and configure the connection through the environment, as with `CONTAO_E2E_DATABASE_URL` for an external database:
+
+```shell
+export CONTAO_E2E_MAIL_CAPTURE_API_URL=http://mail-catcher.local:8025
+export CONTAO_E2E_MAIL_CAPTURE_SMTP_DSN=smtp://mail-catcher.local:1025
+composer test
+```
+
+Both variables must be set together. With neither set, `withMailCapture()` provisions Docker automatically. External settings do not enable mail capture on their own. An explicit `MailCaptureConfig` or `DockerMailCaptureConfig` takes precedence, and `withMailCapture(null)` still disables capture. Invalid or incomplete environment settings fail instead of silently starting a container.
+
 ## Choose the Docker image
 
 The default image uses the floating release tag `axllent/mailpit:latest`, following Docker's normal local image caching behavior.
@@ -74,15 +86,12 @@ final class RegistrationTest extends TestCase
 
     protected function mailbox(): Mailbox
     {
-        return new Mailbox(new MailCaptureConfig(
-            'http://127.0.0.1:8025',
-            'smtp://127.0.0.1:1025',
-        ));
+        return new Mailbox(MailCaptureConfig::fromEnvironment());
     }
 }
 ```
 
-Configure the application under test to send to the supplied SMTP DSN before booting its kernel or starting its server. Constructing a `Mailbox` only configures API access. For API authentication, pass a configured Symfony HTTP client as the second constructor argument.
+Set the two connection variables above and configure the application under test to send to that SMTP DSN before booting its kernel or starting its server. Constructing a `Mailbox` only configures API access. For API authentication, pass a configured Symfony HTTP client as the second constructor argument.
 
 For automatic Docker startup outside Managed Editions, create a `DockerMailCaptureService` with `CacheConfig::forProject($projectDirectory)` and call `connection()`. It returns the `MailCaptureConfig` containing `apiUrl` and `mailerDsn`. A custom PHPUnit base class can also return this service from `DockerServiceProviderInterface::dockerServices()` to participate in warm-up.
 
