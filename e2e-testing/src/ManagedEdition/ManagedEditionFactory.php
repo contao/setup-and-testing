@@ -43,6 +43,7 @@ final readonly class ManagedEditionFactory
 
     public function create(ManagedEditionConfig $config): ManagedEdition
     {
+        $config = $config->withMailCapture($config->mailCaptureConnection());
         $cache = $config->environment->cache;
         $databaseServer = $this->runtime->initialize($config->environment);
         $fingerprints = $this->fingerprintCalculator->calculate($config);

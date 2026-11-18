@@ -23,6 +23,9 @@ use Contao\E2eTesting\Database\DatabaseServerConfig;
 use Contao\E2eTesting\Http\ServerManager;
 use Contao\E2eTesting\Installation\InstallationLease;
 use Contao\E2eTesting\Installation\PreparedInstallation;
+use Contao\E2eTesting\Mail\Mailbox;
+use Contao\E2eTesting\Mail\MailCaptureConfig;
+use Contao\E2eTesting\Mail\MessageQuery;
 use Contao\E2eTesting\ManagedEdition\ManagedEdition;
 use Contao\E2eTesting\ManagedEdition\ManagedEditionConfig;
 use Contao\E2eTesting\ManagedEdition\ManagedEditionState;
@@ -43,6 +46,8 @@ use PHPUnit\Framework\TestCase;
 use Playwright\Browser\BrowserContextInterface;
 use Playwright\Page\PageInterface;
 use Symfony\Component\Filesystem\Filesystem;
+use Symfony\Component\HttpClient\MockHttpClient;
+use Symfony\Component\HttpClient\Response\MockResponse;
 
 final class ManagedEditionFixtureTest extends TestCase
 {
@@ -69,6 +74,30 @@ final class ManagedEditionFixtureTest extends TestCase
     {
         $this->application->release();
         (new Filesystem())->remove($this->directory);
+    }
+
+    public function testResettingAnUnusedMailboxDoesNotCreateIt(): void
+    {
+        $this->application->resetMailbox();
+
+        $this->assertNull((new \ReflectionProperty(ManagedEdition::class, 'mailbox'))->getValue($this->application));
+    }
+
+    public function testReleaseClearsObservedMailFromDirectMailboxReads(): void
+    {
+        $client = new MockHttpClient([
+            new MockResponse('{"messages":[{"ID":"observed"}],"messages_count":1}'),
+            new MockResponse('{"ID":"observed","Subject":"Confirm","Text":"Body","HTML":"","To":[{"Address":"test@example.test"}]}'),
+            new MockResponse('OK'),
+        ]);
+        $mailbox = new Mailbox(new MailCaptureConfig('http://mail-capture', 'smtp://localhost'), $client);
+        (new \ReflectionProperty(ManagedEdition::class, 'mailbox'))->setValue($this->application, $mailbox);
+        $this->assertSame($mailbox, $this->application->mailbox());
+        $this->application->mailbox()->messages(MessageQuery::to('test@example.test'));
+        $this->application->release();
+        $this->application->resetMailbox();
+
+        $this->assertSame(3, $client->getRequestsCount());
     }
 
     public function testConsoleRunsInTheInstallationWithItsDatabase(): void

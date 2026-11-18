@@ -61,6 +61,7 @@ nav:
           - Contao backend interactions: testing/backend.md
           - Frontend tests and HTTP requests: testing/frontend.md
           - Databases and isolation: testing/databases.md
+          - Email delivery: testing/mail.md
           - Test-specific DCA: testing/dca.md
           - Custom PHPUnit base classes: testing/phpunit.md
           - Caching and maintenance: testing/caching.md

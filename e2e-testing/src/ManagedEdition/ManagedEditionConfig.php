@@ -25,12 +25,17 @@ use Contao\E2eTesting\Database\DockerDatabaseService;
 use Contao\E2eTesting\Docker\DockerServiceInterface;
 use Contao\E2eTesting\Http\PhpServerConfig;
 use Contao\E2eTesting\Installation\InstallationPool;
+use Contao\E2eTesting\Mail\DockerMailCaptureConfig;
+use Contao\E2eTesting\Mail\DockerMailCaptureService;
+use Contao\E2eTesting\Mail\MailCaptureConfig;
 use Contao\InstallationRecipe\File\FileMapping;
 use Contao\InstallationRecipe\Recipe\InstallationRecipe;
 
 final class ManagedEditionConfig implements ApplicationConfigInterface
 {
     private PhpServerConfig $phpServer;
+
+    private DockerMailCaptureConfig|MailCaptureConfig|null $mailCapture = null;
 
     /**
      * @var array<string, string|false>
@@ -90,7 +95,9 @@ final class ManagedEditionConfig implements ApplicationConfigInterface
      */
     public function environmentVariables(): array
     {
-        return $this->environmentVariables;
+        return $this->mailCapture instanceof MailCaptureConfig
+            ? array_replace($this->environmentVariables, ['MAILER_DSN' => $this->mailCapture->mailerDsn])
+            : $this->environmentVariables;
     }
 
     /**
@@ -106,7 +113,7 @@ final class ManagedEditionConfig implements ApplicationConfigInterface
 
     public function withEnvironment(ManagedEditionEnvironment $environment): self
     {
-        return (new self($this->recipe, $environment, $this->resetMode, $this->appEnvironment))->withPhpServer($this->phpServer)->withEnvironmentVariables($this->environmentVariables);
+        return (new self($this->recipe, $environment, $this->resetMode, $this->appEnvironment))->withPhpServer($this->phpServer)->withEnvironmentVariables($this->environmentVariables)->withMailCapture($this->mailCapture);
     }
 
     public function withDatabase(DatabaseServerConfig|DockerDatabaseConfig $database): self
@@ -119,14 +126,43 @@ final class ManagedEditionConfig implements ApplicationConfigInterface
      */
     public function dockerServices(): array
     {
-        if ($this->environment->database instanceof DatabaseServerConfig) {
-            return [];
+        $services = [];
+
+        if (!$this->environment->database instanceof DatabaseServerConfig) {
+            $services[] = new DockerDatabaseService(
+                $this->environment->cache,
+                $this->environment->database ?? DockerDatabaseConfig::fromEnvironment(),
+            );
         }
 
-        return [new DockerDatabaseService(
-            $this->environment->cache,
-            $this->environment->database ?? DockerDatabaseConfig::fromEnvironment(),
-        )];
+        if ($this->mailCapture instanceof DockerMailCaptureConfig) {
+            $services[] = new DockerMailCaptureService($this->environment->cache, $this->mailCapture);
+        }
+
+        return $services;
+    }
+
+    public function withMailCapture(DockerMailCaptureConfig|MailCaptureConfig|null $mailCapture = new DockerMailCaptureConfig()): self
+    {
+        $clone = clone $this;
+        // Explicit configurations, including null to disable capture, bypass the environment
+        $clone->mailCapture = 0 === \func_num_args()
+            ? MailCaptureConfig::tryFromEnvironment() ?? $mailCapture
+            : $mailCapture;
+
+        return $clone;
+    }
+
+    public function mailCapture(): DockerMailCaptureConfig|MailCaptureConfig|null
+    {
+        return $this->mailCapture;
+    }
+
+    public function mailCaptureConnection(): MailCaptureConfig|null
+    {
+        return $this->mailCapture instanceof DockerMailCaptureConfig
+            ? (new DockerMailCaptureService($this->environment->cache, $this->mailCapture))->connection()
+            : $this->mailCapture;
     }
 
     public function withDcaFile(string $path): self
@@ -137,7 +173,7 @@ final class ManagedEditionConfig implements ApplicationConfigInterface
 
         $mapping = new FileMapping($path, 'contao/dca/'.basename($path));
 
-        return (new self($this->recipe->withFileMapping($mapping), $this->environment, $this->resetMode, $this->appEnvironment))->withPhpServer($this->phpServer)->withEnvironmentVariables($this->environmentVariables);
+        return (new self($this->recipe->withFileMapping($mapping), $this->environment, $this->resetMode, $this->appEnvironment))->withPhpServer($this->phpServer)->withEnvironmentVariables($this->environmentVariables)->withMailCapture($this->mailCapture);
     }
 
     public function withSimulatedOrigins(): self
@@ -150,16 +186,16 @@ final class ManagedEditionConfig implements ApplicationConfigInterface
             }
         }
 
-        return (new self($this->recipe->withConfigFile($path), $this->environment, $this->resetMode, $this->appEnvironment))->withPhpServer($this->phpServer)->withEnvironmentVariables($this->environmentVariables);
+        return (new self($this->recipe->withConfigFile($path), $this->environment, $this->resetMode, $this->appEnvironment))->withPhpServer($this->phpServer)->withEnvironmentVariables($this->environmentVariables)->withMailCapture($this->mailCapture);
     }
 
     public function withResetMode(DatabaseResetMode $resetMode): self
     {
-        return (new self($this->recipe, $this->environment, $resetMode, $this->appEnvironment))->withPhpServer($this->phpServer)->withEnvironmentVariables($this->environmentVariables);
+        return (new self($this->recipe, $this->environment, $resetMode, $this->appEnvironment))->withPhpServer($this->phpServer)->withEnvironmentVariables($this->environmentVariables)->withMailCapture($this->mailCapture);
     }
 
     public function withAppEnvironment(string $appEnvironment): self
     {
-        return (new self($this->recipe, $this->environment, $this->resetMode, $appEnvironment))->withPhpServer($this->phpServer)->withEnvironmentVariables($this->environmentVariables);
+        return (new self($this->recipe, $this->environment, $this->resetMode, $appEnvironment))->withPhpServer($this->phpServer)->withEnvironmentVariables($this->environmentVariables)->withMailCapture($this->mailCapture);
     }
 }
