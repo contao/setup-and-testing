@@ -27,6 +27,45 @@ final class MailAssertionsTraitTest extends TestCase
 
     private Mailbox|null $configuredMailbox = null;
 
+    private int $mailboxCreations = 0;
+
+    public function testCleanupDoesNotCreateAnUnusedMailbox(): void
+    {
+        $this->resetAssertedMailbox();
+        $this->resetAssertedMailbox();
+
+        $this->assertSame(0, $this->mailboxCreations);
+    }
+
+    public function testMailAssertionsReuseOneMailboxAndCleanupOnlyOnce(): void
+    {
+        $requests = [];
+        $client = new MockHttpClient(
+            static function (string $method, string $url, array $options) use (&$requests): MockResponse {
+                $requests[] = [$method, $options['body'] ?? null];
+
+                if ('DELETE' === $method) {
+                    return new MockResponse('OK');
+                }
+
+                return new MockResponse(str_contains($url, '/search?')
+                    ? '{"messages":[{"ID":"delivered"}],"messages_count":1}'
+                    : '{"ID":"delivered","Subject":"Confirm","Text":"Body","HTML":"","To":[{"Address":"test@example.test"}]}',
+                );
+            },
+        );
+        $this->configuredMailbox = new Mailbox(new MailCaptureConfig('http://mail-capture', 'smtp://localhost'), $client);
+        $query = MessageQuery::to('test@example.test');
+        $this->assertEmailSent($query);
+        $this->assertEmailCount(1, $query);
+        $this->resetAssertedMailbox();
+        $this->resetAssertedMailbox();
+
+        $this->assertSame(1, $this->mailboxCreations);
+        $this->assertCount(5, $requests);
+        $this->assertSame(['DELETE', '{"IDs":["delivered"]}'], $requests[4]);
+    }
+
     public function testSuccessfulDeliveryCountsAsAPhpUnitAssertion(): void
     {
         $this->configuredMailbox = new Mailbox(
@@ -34,6 +73,7 @@ final class MailAssertionsTraitTest extends TestCase
             new MockHttpClient([
                 new MockResponse('{"messages":[{"ID":"delivered"}],"messages_count":1}'),
                 new MockResponse('{"ID":"delivered","Subject":"Confirm","Text":"Body","HTML":"","To":[{"Address":"test@example.test"}]}'),
+                new MockResponse('OK'),
             ]),
         );
         $before = $this->getCount();
@@ -63,6 +103,8 @@ final class MailAssertionsTraitTest extends TestCase
 
     protected function mailbox(): Mailbox
     {
+        ++$this->mailboxCreations;
+
         return $this->configuredMailbox ?? new Mailbox(
             new MailCaptureConfig('http://mail-capture', 'smtp://localhost'),
             new MockHttpClient(static fn () => new MockResponse('{"messages":[],"messages_count":0}')),

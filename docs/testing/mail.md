@@ -94,7 +94,11 @@ Without PHPUnit helpers, use `$mailbox->messages($query)` for a current snapshot
 
 ## Isolation and asynchronous mail
 
-Generate a fresh recipient with `MessageQuery::uniqueRecipient()` for each test. Messages persist for the life of the process's container. Database resets do not clear the mailbox, and the helpers do not delete messages. Unique recipients prevent earlier tests and parallel tests sharing an external instance from satisfying the wrong assertion.
+Managed Edition test cases and the assertion trait clean up messages observed by the test after it finishes. Cleanup sends one batch deletion only when a query returned matching messages. It makes no empty-inbox probes, and untouched mailboxes or queries returning no matches need no cleanup request. Repeated reads of the same message do not create duplicate deletions. Cleanup also runs after failed tests and reports deletion failures.
+
+Only observed, matching messages are deleted. Other messages in a shared external instance remain untouched. Mail sent without being read by a query, or delivered by a queue after cleanup, is not covered by this tracking. Generate a fresh recipient with `MessageQuery::uniqueRecipient()` for each test to avoid matching those messages or mail from parallel tests.
+
+Managed Edition mailboxes are reused across assertions and cleaned up when the application is released as well. Database resets do not clear the mailbox. If you use the standalone client directly outside the assertion helpers, call `$mailbox->reset()` in your test teardown. It uses the same tracked-message cleanup and does nothing when no matching messages were observed.
 
 Message-count assertions check the current snapshot. A zero count does not prove that queued work will never send mail later. If your application queues mail through Messenger or another queue, run the appropriate worker or configure synchronous handling for the test environment. The mailbox helpers wait for delivery but do not process application queues.
 

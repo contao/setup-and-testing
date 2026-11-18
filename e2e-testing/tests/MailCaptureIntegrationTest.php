@@ -48,6 +48,21 @@ final class MailCaptureIntegrationTest extends TestCase
         $this->assertEmailCount(0, MessageQuery::to(MessageQuery::uniqueRecipient()));
     }
 
+    public function testCleanupAllowsReusingTheSameRecipientForTheNextTest(): void
+    {
+        $recipient = MessageQuery::uniqueRecipient();
+        $query = MessageQuery::to($recipient);
+        $this->sendMail($recipient);
+        $first = $this->assertEmailSent($query);
+        $this->resetAssertedMailbox();
+        $this->assertEmailCount(0, $query);
+        $this->sendMail($recipient);
+        $second = $this->assertEmailSent($query);
+
+        $this->assertNotSame($first->id(), $second->id());
+        $this->assertEmailCount(1, $query);
+    }
+
     public function testConnectionsAreReusedWithinAProcessAndChildContainersAreRemoved(): void
     {
         $first = $this->service()->connection();

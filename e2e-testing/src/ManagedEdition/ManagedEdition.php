@@ -39,6 +39,8 @@ final class ManagedEdition implements ApplicationInterface
 
     private ServerProcess|null $server = null;
 
+    private Mailbox|null $mailbox = null;
+
     private string|null $preparedFixtureFingerprint = null;
 
     /**
@@ -71,13 +73,22 @@ final class ManagedEdition implements ApplicationInterface
 
     public function mailbox(): Mailbox
     {
+        if ($this->mailbox) {
+            return $this->mailbox;
+        }
+
         $connection = $this->state->config->mailCaptureConnection();
 
         if (!$connection) {
             throw new \LogicException('Enable mail capture with ManagedEditionConfig::withMailCapture() before accessing the mailbox.');
         }
 
-        return new Mailbox($connection);
+        return $this->mailbox = new Mailbox($connection);
+    }
+
+    public function resetMailbox(): void
+    {
+        $this->mailbox?->reset();
     }
 
     public function database(): DatabaseManager
@@ -191,7 +202,11 @@ final class ManagedEdition implements ApplicationInterface
     public function release(): void
     {
         try {
-            $this->browserRuntime->reset();
+            try {
+                $this->resetMailbox();
+            } finally {
+                $this->browserRuntime->reset();
+            }
         } finally {
             try {
                 $this->releaseServer();

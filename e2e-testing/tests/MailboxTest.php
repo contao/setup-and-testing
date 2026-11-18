@@ -23,6 +23,66 @@ use Symfony\Component\HttpClient\Response\MockResponse;
 
 final class MailboxTest extends TestCase
 {
+    public function testResetDoesNotSendRequestsForAnUntouchedOrEmptyMailbox(): void
+    {
+        $client = new MockHttpClient([new MockResponse('{"messages":[],"messages_count":0}')]);
+        $mailbox = new Mailbox(new MailCaptureConfig('http://mail-capture', 'smtp://localhost'), $client);
+        $mailbox->reset();
+        $mailbox->reset();
+        $this->assertSame(0, $client->getRequestsCount());
+        $this->assertSame([], $mailbox->messages(MessageQuery::to('test@example.test')));
+        $mailbox->reset();
+        $this->assertSame(1, $client->getRequestsCount());
+    }
+
+    public function testResetBatchesMatchingMessagesWithoutDeletingOtherMail(): void
+    {
+        $requests = [];
+        $responses = [
+            ['messages' => [['ID' => 'one'], ['ID' => 'unrelated'], ['ID' => 'two']], 'messages_count' => 3],
+            $this->message('one'),
+            $this->message('unrelated', 'other-test@example.test'),
+            $this->message('two'),
+        ];
+        $client = new MockHttpClient(
+            static function (string $method, string $url, array $options) use (&$responses, &$requests): MockResponse {
+                $requests[] = [$method, $url, $options['body'] ?? null];
+
+                return new MockResponse('DELETE' === $method ? 'OK' : json_encode(array_shift($responses), JSON_THROW_ON_ERROR));
+            },
+        );
+        $mailbox = new Mailbox(new MailCaptureConfig('http://mail-capture', 'smtp://localhost'), $client);
+        $this->assertCount(2, $mailbox->messages(MessageQuery::to('test@example.test')));
+        $mailbox->reset();
+        $mailbox->reset();
+
+        $this->assertCount(5, $requests);
+        $this->assertSame(['DELETE', 'http://mail-capture/api/v1/messages', '{"IDs":["one","two"]}'], $requests[4]);
+    }
+
+    public function testFailedResetCanBeRetriedWithoutLosingPendingMessages(): void
+    {
+        $client = new MockHttpClient([
+            new MockResponse('{"messages":[{"ID":"pending"}],"messages_count":1}'),
+            new MockResponse(json_encode($this->message('pending'), JSON_THROW_ON_ERROR)),
+            new MockResponse('Unavailable', ['http_code' => 503]),
+            new MockResponse('OK'),
+        ]);
+        $mailbox = new Mailbox(new MailCaptureConfig('http://mail-capture', 'smtp://localhost'), $client);
+        $mailbox->waitForMessage(MessageQuery::to('test@example.test'));
+
+        try {
+            $mailbox->reset();
+            $this->fail('Expected the failed deletion to be reported.');
+        } catch (MailCaptureException $exception) {
+            $this->assertStringContainsString('Could not reset captured mail', $exception->getMessage());
+        }
+
+        $mailbox->reset();
+        $mailbox->reset();
+        $this->assertSame(4, $client->getRequestsCount());
+    }
+
     public function testFiltersExactRecipientAndSubjectAndFollowsPagination(): void
     {
         $urls = [];

@@ -16,15 +16,42 @@ use Contao\E2eTesting\Exception\MailCaptureException;
 use Symfony\Component\HttpClient\HttpClient;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 
-final readonly class Mailbox
+final class Mailbox
 {
-    private HttpClientInterface $client;
+    private readonly HttpClientInterface $client;
+
+    /**
+     * @var array<string, string>
+     */
+    private array $observedMessages = [];
 
     public function __construct(
-        public MailCaptureConfig $config,
+        public readonly MailCaptureConfig $config,
         HttpClientInterface|null $client = null,
     ) {
         $this->client = $client ?? HttpClient::create();
+    }
+
+    public function reset(): void
+    {
+        if ([] === $this->observedMessages) {
+            return;
+        }
+
+        $options = [
+            'json' => ['IDs' => array_values($this->observedMessages)],
+            'timeout' => 10,
+            'max_duration' => 10,
+        ];
+
+        try {
+            $response = $this->client->request('DELETE', rtrim($this->config->apiUrl, '/').'/api/v1/messages', $options);
+            $response->getContent();
+        } catch (\Throwable $exception) {
+            throw new MailCaptureException('Could not reset captured mail at '.$this->config->apiUrl.': '.$exception->getMessage(), 0, $exception);
+        }
+
+        $this->observedMessages = [];
     }
 
     /**
@@ -80,6 +107,8 @@ final readonly class Mailbox
                 $message = new CapturedMessage($this->get('/api/v1/message/'.rawurlencode($summary['ID']), $deadline));
 
                 if ($query->matches($message)) {
+                    $this->observedMessages[$message->id()] = $message->id();
+
                     yield $message;
                 }
             }
