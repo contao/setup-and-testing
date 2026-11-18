@@ -21,13 +21,9 @@ Mail capture participates in the existing [Docker warm-up](databases.md) mechani
 
 ## Choose the Docker image
 
-The default image uses the floating release tag `axllent/mailpit:latest`, following Docker's normal local image caching behavior. Set `CONTAO_E2E_MAIL_CAPTURE_IMAGE` to use a specific tag, digest or registry mirror without changing test code:
+The default image uses the floating release tag `axllent/mailpit:latest`, following Docker's normal local image caching behavior.
 
-```shell
-CONTAO_E2E_MAIL_CAPTURE_IMAGE=axllent/mailpit:v1.27.4 vendor/bin/phpunit --testsuite=e2e
-```
-
-For a per-class choice, pass `withMailCapture(new DockerMailCaptureConfig('axllent/mailpit:v1.27.4'))` from the `Contao\E2eTesting\Mail` namespace. An explicit image takes precedence over the environment variable. Image selection is fixed when the configuration is constructed and participates in container reuse, so different images receive different containers. Custom images must provide the Mailpit-compatible API, SMTP ports and startup options used by the current implementation.
+For a per-class choice, pass `withMailCapture(new DockerMailCaptureConfig('axllent/mailpit:v1.27.4'))` from the `Contao\E2eTesting\Mail` namespace. Image selection participates in container reuse, so different images receive different containers. Custom images must provide the Mailpit-compatible API, SMTP ports and startup options used by the current implementation.
 
 ## Assert on captured messages
 
